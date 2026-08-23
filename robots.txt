@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://dossiersanitario.it/sitemap.xml
