@@ -16,7 +16,7 @@ async function avvia(base){
   importScripts(PYODIDE+'pyodide.js');
   py=await loadPyodide({indexURL:PYODIDE});
   stato('Caricamento dei componenti del motore…');
-  await py.loadPackage(['numpy','pillow','pyodide-http']);
+  await py.loadPackage(['numpy','pillow','pyodide-http','hashlib']);
   py.FS.mkdirTree('/dati');
   py.FS.mount(py.FS.filesystems.IDBFS,{},'/dati');
   await syncfs(true);
