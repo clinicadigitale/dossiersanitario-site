@@ -1,0 +1,15 @@
+{
+  "schema": 3,
+  "active": true,
+  "mode": "diagnostics",
+  "noticeVersion": "2026-08-27-diagnostics-v1",
+  "displayName": "1.0.1",
+  "diagnostics": {
+    "enabled": true,
+    "automaticCollection": true,
+    "transport": "mega-file-request",
+    "endpoint": "https://mega.nz/filerequest/eJ9jSWQJRIc",
+    "automaticTransmission": false,
+    "includeClinicalData": false
+  }
+}

@@ -24,6 +24,8 @@ async function avvia(base){
   const scarica=async(url)=>{const r=await fetch(url,{cache:'no-cache'});if(!r.ok)throw new Error('file mancante: '+url);return await r.text();};
   await Promise.all(FILE_MOTORE.map(async f=>{py.FS.writeFile('/motore/'+f,await scarica(base+'python_engine/'+nomeWeb(f)));}));
   py.FS.writeFile('/ponte/ponte_web.py',await scarica(base+'ponte/ponte_web.py'));
+  // file di configurazione che il motore legge dalla cartella del programma (ROOT = cartella sopra /motore)
+  for(const f of ['diagnostics_config.json']){py.FS.writeFile('/'+f,await scarica(base+f));}
   py.runPython("import sys\nsys.path.insert(0,'/ponte')\nimport ponte_web\nponte_web.prepara_ambiente('/dati','/motore')\nponte_web.motore()");
   ponte=py.globals.get('ponte_web')||py.pyimport('ponte_web');
   stato('Motore del Dossier pronto',true);
