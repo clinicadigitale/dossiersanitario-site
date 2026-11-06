@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0877d1">
+  <title>Clinica Digitale - Dossier Sanitario 1.0.1</title>
+  <link rel="manifest" href="manifest.webmanifest?v=1.0.1">
+  <script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister())).catch(()=>{});
+  if ('caches' in window) caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('dossier-sanitario-v1')).map(k=>caches.delete(k)))).catch(()=>{});
+  </script>
+  <script src="ponte/bridge.js?v=web1"></script>
+  <link rel="icon" href="assets/icon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="css/app.css?v=1.0.1-license-r9-shared-plan-ui">
+</head>
+<body>
+  <div id="appShell" class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark brand-icon" aria-hidden="true"><img src="assets/icon-64.png" alt=""></div>
+        <div>
+          <strong>Clinica Digitale</strong>
+          <span id="appVersionDeveloperTrigger">Dossier Sanitario · 1.0.1</span>
+        </div>
+      </div>
+
+      <div class="profile-switcher">
+        <div class="profile-label-row"><label for="profileSelect">Profilo attivo</label><span id="activeProfileColorDot" class="profile-color-dot" aria-hidden="true"></span></div>
+        <div class="profile-switcher-row"><button type="button" id="profileDataAvatarBtn" class="profile-avatar-shortcut" aria-label="Apri dati del profilo"><div id="activeProfileAvatar" class="profile-switcher-avatar"></div></button><select id="profileSelect" aria-label="Seleziona profilo"></select></div>
+        <button type="button" class="btn btn-light btn-full profile-data-page-btn" id="profileDataPageBtn">Dati del profilo</button>
+        <button class="btn btn-primary btn-full" id="addProfileBtn">Aggiungi persona</button>
+      </div>
+
+      <nav class="nav nav-v13" id="mainNav" aria-label="Sezioni principali">
+        <button class="nav-item nav-item-major active" data-view="dashboard"><span class="nav-icon nav-tone-blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5v8a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5z"/></svg></span><span>Panoramica</span></button>
+        <details class="nav-group">
+          <summary><span class="nav-icon nav-tone-rose"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21S4 16.1 4 9.5A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 8 3.5C20 16.1 12 21 12 21z"/></svg></span><span>Salute</span><span class="nav-chevron">⌄</span></summary>
+          <div class="nav-group-items">
+            <button class="nav-item" data-view="diagnoses">Diagnosi e condizioni</button>
+            <button class="nav-item" data-view="symptom-diary">Diario sintomi</button>
+            <button class="nav-item" data-view="therapies">Terapie</button>
+            <button class="nav-item" data-view="vaccinations">Vaccinazioni</button>
+            <button class="nav-item" data-view="interventions">Interventi e dispositivi</button>
+            <button class="nav-item" data-view="exemptions">Esenzioni</button>
+            <button class="nav-item" data-view="timeline">Cronologia clinica</button>
+            <button class="nav-item" data-view="graphs">Grafici clinici</button>
+            <button class="nav-item" data-view="compare">Confronta</button>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary><span class="nav-icon nav-tone-cyan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 12h6M9 16h6"/></svg></span><span>Documenti</span><span class="nav-chevron">⌄</span></summary>
+          <div class="nav-group-items">
+            <button class="nav-item" data-view="documents">Archivio documenti</button>
+            <button class="nav-item" data-view="search-dossier">Cerca nel Dossier</button>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary><span class="nav-icon nav-tone-green"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m5 10V4m5 16v-7m5 7V7"/></svg></span><span>Monitoraggio</span><span class="nav-chevron">⌄</span></summary>
+          <div class="nav-group-items">
+            <button class="nav-item" data-view="monitor-home">Panoramica</button>
+            <button class="nav-item" data-view="monitor-weight">Percorso peso</button>
+            <button class="nav-item" data-view="monitor-pressure">Pressione e frequenza</button>
+            <button class="nav-item" data-view="monitor-glucose">Glicemia</button>
+            <button class="nav-item" data-view="monitor-spo2">Saturazione</button>
+            <button class="nav-item" data-view="monitor-body">Misurazioni corporee</button>
+            <button class="nav-item" data-view="monitor-graphs">Grafici monitoraggio</button>
+          </div>
+        </details>
+        <button class="nav-item nav-item-major" data-view="calendar"><span class="nav-icon nav-tone-pink"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 9h18"/></svg></span><span>Agenda</span></button>
+        <details class="nav-group">
+          <summary><span class="nav-icon nav-tone-teal"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3.5 20c.5-4 2.4-6 5.5-6s5 2 5.5 6M14 15c3.2-.2 5.4 1.4 6 5"/></svg></span><span>Medici e visite</span><span class="nav-chevron">⌄</span></summary>
+          <div class="nav-group-items">
+            <button class="nav-item" data-view="doctors">Medici e specialisti</button>
+            <button class="nav-item" data-view="prepare-visit">Prepara visita</button>
+          </div>
+        </details>
+        <details class="nav-group">
+          <summary><span class="nav-icon nav-tone-violet"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.5 1A7 7 0 0 0 14.7 6L14.4 3h-4.8L9.3 6a7 7 0 0 0-1.7 1.1l-2.5-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.5-1A7 7 0 0 0 9.3 18l.3 3h4.8l.3-3a7 7 0 0 0 1.7-1.1l2.5 1 2-3.4-2-1.5c.1-.3.1-.7.1-1z"/></svg></span><span>Impostazioni e aiuto</span><span class="nav-chevron">⌄</span></summary>
+          <div class="nav-group-items">
+            <button class="nav-item" data-view="preferences">Preferenze</button>
+            <button class="nav-item" data-view="access-log">Registro accessi</button>
+            <button class="nav-item" data-view="interoperability">Interoperabilità</button>
+            <button class="nav-item" data-view="backup">Backup</button>
+            <button class="nav-item" data-view="help">Aiuto</button>
+          </div>
+        </details>
+      </nav>
+      <nav class="nav monitor-nav hidden v13-legacy-monitor-nav" id="monitorNav" aria-label="Monitoraggio personale">
+        <div class="nav-section-label">Monitoraggio personale</div>
+        <button class="nav-item nav-back" data-view="dashboard">← Torna al dossier</button>
+        <button class="nav-item" data-view="monitor-home">Panoramica</button>
+        <button class="nav-item" data-view="monitor-weight">Percorso peso</button>
+        <button class="nav-item" data-view="monitor-glucose">Glicemia</button>
+        <button class="nav-item" data-view="monitor-pressure">Pressione</button>
+        <button class="nav-item" data-view="monitor-spo2">Saturazione</button>
+        <button class="nav-item" data-view="monitor-body">Misurazioni</button>
+        <button class="nav-item" data-view="monitor-preferences">Preferenze</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span id="appStatusDot" class="status-dot"></span>
+        <span id="appStatusText">Archivio locale pronto</span>
+      </div>
+      <div class="sidebar-session">
+        <button class="sidebar-logout" id="lockNowBtn" title="Esci dall’account" type="button"><span class="sidebar-logout-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"/><path d="m14 8 4 4-4 4"/><path d="M18 12H9"/></svg></span><span>Logout</span></button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn menu-btn" id="menuBtn" aria-label="Apri menu">☰</button>
+        <div class="topbar-view-heading">
+          <h1 id="viewTitle">Panoramica</h1>
+          <p id="viewSubtitle">Gestisci in modo ordinato i documenti sanitari.</p>
+        </div>
+        <button class="global-search-shortcut" id="globalSearchBtn" type="button" aria-label="Cerca nel Dossier">
+          <span class="global-search-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg></span><span>Cerca nel tuo dossier, visite, referti…</span>
+        </button>
+        <div class="top-actions">
+          <button class="btn btn-light" id="addDocumentBtn">Aggiungi documento</button>
+          <button class="btn btn-light" id="doctorExportBtn">Versione per medico</button>
+          <button class="btn btn-primary" id="exportPdfBtn">Esporta dossier PDF</button>
+        </div>
+      </header>
+
+      <section id="emptyState" class="empty-state hidden">
+        <div class="empty-icon">+</div>
+        <h2>Crea il primo profilo sanitario</h2>
+        <p>Ogni persona avrà una cartella separata, una cronologia e un dossier esportabile.</p>
+        <button class="btn btn-primary" id="emptyAddProfileBtn">Aggiungi persona</button>
+      </section>
+
+      <div id="viewContainer" class="view-container"></div>
+    </main>
+  </div>
+
+  <div id="modalBackdrop" class="modal-backdrop hidden" aria-hidden="true"></div>
+  <section id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header">
+      <div>
+        <h2 id="modalTitle">Titolo</h2>
+        <p id="modalSubtitle"></p>
+      </div>
+      <button class="icon-btn" id="closeModalBtn" aria-label="Chiudi">×</button>
+    </div>
+    <div id="modalBody" class="modal-body"></div>
+  </section>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+  <div id="printRoot" class="print-root" aria-hidden="true"></div>
+
+  <script src="librerie/jszip.min.js?v=1.0.1"></script>
+  <script src="js/extractors.js?v=1.0.1-public-r5-clinical-status"></script>
+  <script src="js/ocr.js?v=1.0.1"></script>
+  <script src="js/charts.js?v=1.0.1-public-r5-clinical-status"></script>
+  <script src="js/report.js?v=1.0.1-public-r5-clinical-status"></script>
+  <script src="js/db.js?v=1.0.1-public-r4"></script>
+  <script src="js/features.js?v=1.0.1-license-r10"></script>
+  <script src="js/security.js?v=1.0.1-license-r10"></script>
+  <script src="js/cloud.js?v=1.0.1-public-r4"></script>
+  <script src="js/calendar.js?v=1.0.1-license-r7"></script>
+  <script src="js/diagnostics.js?v=1.0.1"></script>
+  <script src="js/update_manager.js?v=1.0.1-public-r4"></script>
+  <script src="js/doctor_export.js?v=1.0.1-license-r7"></script>
+  <script src="js/medicines.js?v=1.0.1-license-r7"></script>
+  <script src="js/app.js?v=1.0.1-license-r10"></script>
+  <script src="js/clinical_lot1.js?v=1.0.1-v15-lot1-integrated"></script>
+  <script src="js/clinical_lot2.js?v=1.0.1-v16-fix13"></script>
+  <script src="js/clinical_lot3.js?v=1.0.1-v16-lot3-fix5"></script>
+</body>
+</html>
