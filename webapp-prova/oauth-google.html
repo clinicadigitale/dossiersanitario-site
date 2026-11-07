@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><title>Google Calendar · Clinica Digitale</title>
+<style>body{font-family:Segoe UI,system-ui,sans-serif;background:#f4f7f9;color:#14243a;margin:0;padding:32px}main{max-width:460px;margin:40px auto;background:#fff;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,.08)}h1{font-size:20px;margin:0 0 12px}p{line-height:1.5}</style></head>
+<body><main><h1 id="t">Collegamento a Google Calendar…</h1><p id="m">Sto consegnando l'autorizzazione al Dossier aperto nell'altra scheda.</p></main>
+<script>
+(function(){
+  var q=location.search.replace(/^\?/,''),t=document.getElementById('t'),m=document.getElementById('m');
+  // la risposta di Google non deve restare nella barra degli indirizzi
+  try{history.replaceState(null,'',location.pathname);}catch(e){}
+  if(!q){t.textContent='Nessuna risposta da Google';m.textContent='Torna al Dossier e ripeti il collegamento.';return;}
+  var c;try{c=new BroadcastChannel('dossier-google-oauth');}catch(e){}
+  if(!c){t.textContent='Browser non compatibile';m.textContent='Questo browser non permette di completare il collegamento.';return;}
+  var finito=false;
+  c.onmessage=function(e){var d=e.data||{};if(d.tipo!=='esito')return;finito=true;
+    t.textContent=d.ok?'Google Calendar collegato':'Collegamento non riuscito';
+    m.textContent=d.ok?'Puoi chiudere questa finestra e tornare al Dossier.':(d.testo||'Torna al Dossier e ripeti il collegamento.');
+    if(d.ok)setTimeout(function(){window.close();},1500);};
+  c.postMessage({tipo:'ritorno',query:q});
+  setTimeout(function(){if(!finito){t.textContent='Il Dossier non ha risposto';m.textContent='Tieni aperta la scheda del Dossier, poi ripeti il collegamento.';}},20000);
+})();
+</script></body></html>

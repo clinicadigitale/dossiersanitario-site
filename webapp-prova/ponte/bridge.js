@@ -10,11 +10,12 @@
   let worker=null,seq=0;const attese=new Map();let pronto=false;
   function avvia(){
     if(worker)return worker;
-    worker=new Worker(base+'engine-worker.js?v=web3');
+    worker=new Worker(base+'engine-worker.js?v=web4');
     worker.onmessage=e=>{const m=e.data||{};
       if(m.tipo==='stato'){mostraStato(m.testo,m.fine,m.errore);if(m.fine)pronto=true;return;}
       const a=attese.get(m.id);if(!a)return;attese.delete(m.id);
       if(m.errore){a.reject(new TypeError('Motore del Dossier: '+m.errore));return;}
+      if(a.percorso==='/api/calendar/google/oauth/start'&&m.status===200)apriGoogle(m.corpo);
       a.resolve(new Response(m.status===204||m.status===304?null:m.corpo,{status:m.status,headers:m.intestazioni}));};
     worker.onerror=e=>{mostraStato('Il motore del Dossier non si è avviato: '+(e.message||'errore'),true,true);};
     worker.postMessage({tipo:'avvia',base:new URL('..',base).href});
@@ -26,7 +27,7 @@
     const h={};req.headers.forEach((v,k)=>{h[k]=v;});
     const u=new URL(req.url);
     const id=++seq;
-    return new Promise((resolve,reject)=>{attese.set(id,{resolve,reject});worker.postMessage({tipo:'richiesta',id,metodo:req.method,percorso:u.pathname+u.search,intestazioni:h,corpo},[corpo]);});
+    return new Promise((resolve,reject)=>{attese.set(id,{resolve,reject,percorso:u.pathname});worker.postMessage({tipo:'richiesta',id,metodo:req.method,percorso:u.pathname+u.search,intestazioni:h,corpo},[corpo]);});
   }
   const fetchOriginale=window.fetch.bind(window);
   window.fetch=function(input,init){
@@ -55,6 +56,23 @@
   window.EventSource=function(u,o){if(!isMotore(u))return new ES(u,o);const f={readyState:1,close(){this.readyState=2;},addEventListener(){},removeEventListener(){},onmessage:null,onerror:null,onopen:null};setTimeout(()=>{f.onopen&&f.onopen({});},0);return f;};
   const beacon=navigator.sendBeacon&&navigator.sendBeacon.bind(navigator);
   if(beacon)navigator.sendBeacon=(u,d)=>isMotore(u)?true:beacon(u,d);
+
+  // Google Calendar: nell'exe la pagina di Google si apre nel browser di sistema e
+  // ritorna al motore su 127.0.0.1. Qui la apre il ponte e la pagina di ritorno
+  // (oauth-google.html) consegna la risposta di Google al motore della webapp.
+  function apriGoogle(corpo){
+    let url='';try{url=JSON.parse(new TextDecoder().decode(corpo)).authUrl||'';}catch(_e){}
+    if(!url)return;
+    const w=window.open(url,'dossier_google','width=520,height=680');
+    if(!w){mostraStato('Il browser ha bloccato la finestra di Google. ',true,true);if(box){const a=document.createElement('a');a.href=url;a.target='dossier_google';a.textContent='Apri Google';a.style.cssText='color:#fff;text-decoration:underline;margin-left:6px';a.onclick=()=>setTimeout(()=>{box&&box.remove();box=null;},500);box.appendChild(a);}}
+  }
+  try{
+    const canale=new BroadcastChannel('dossier-google-oauth');
+    canale.onmessage=async e=>{const q=e.data&&e.data.query;if(!q||e.data.tipo!=='ritorno')return;
+      let ok=false,testo='';
+      try{const r=await window.fetch('http://127.0.0.1:'+PORTA+'/'+q);ok=r.ok;testo=(await r.text()).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();}catch(err){testo=String(err&&err.message||err);}
+      canale.postMessage({tipo:'esito',ok,testo});};
+  }catch(_e){}
 
   let box=null;
   function mostraStato(testo,fine,errore){

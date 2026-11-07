@@ -92,6 +92,35 @@ def motore():
         _server = _s
     return _server
 
+# Accesso Google "Clinica Digitale - Webapp" (tipo Applicazione web, progetto
+# clinica-digitale-calendar). Quello dell'exe e' di tipo Desktop e accetta solo
+# il ritorno su 127.0.0.1, che nel browser non esiste.
+_GOOGLE_WEB_ID = "958066311310-b3oeqar4hshckgq1dpl766aq35vc3biq.apps.googleusercontent.com"
+_GOOGLE_WEB_SECRET_XOR_B64 = "KiIuPj01QCYmLiM5ICdaDjUYKy4qKRUDOAMCXCQ8XwEFFVk="
+
+def adatta_google(indirizzo_ritorno):
+    """Fa usare al motore l'accesso Google per il web e la pagina di ritorno della webapp."""
+    import base64
+    s = motore()
+    desktop_id = s.GOOGLE_OAUTH_DEFAULT_CLIENT_ID
+    desktop_secret = s._google_official_client_secret()
+    web_secret = "".join(chr(b ^ 0x6D) for b in base64.b64decode(_GOOGLE_WEB_SECRET_XOR_B64))
+    s.GOOGLE_OAUTH_REDIRECT_URI = indirizzo_ritorno
+    s.GOOGLE_OAUTH_DEFAULT_CLIENT_ID = _GOOGLE_WEB_ID
+    s._google_official_client_secret = lambda: web_secret
+    carica_originale = s._google_calendar_load_config
+    def carica():
+        cfg = carica_originale()
+        # una configurazione arrivata dall'exe punta all'accesso Desktop: nel browser va quello web
+        if str(cfg.get("clientId") or "") in ("", desktop_id):
+            cfg["clientId"] = _GOOGLE_WEB_ID
+            if str(cfg.get("clientSecret") or "") == desktop_secret:
+                cfg["clientSecret"] = ""
+        return cfg
+    s._google_calendar_load_config = carica
+    # la pagina di Google la apre il ponte nel browser (bridge.js)
+    s._open_external_system_browser = lambda url: True
+
 class _Sock:
     def __init__(self, dati):
         self._in = io.BytesIO(dati)
