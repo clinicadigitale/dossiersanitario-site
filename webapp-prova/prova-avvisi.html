@@ -7,7 +7,7 @@
 <body><main>
 <h1>Prova degli avvisi del browser</h1>
 <p>Pagina di prova: nessun dato del Dossier viene letto o salvato. Premi un pulsante: la prima volta il browser chiede il permesso di mostrare notifiche.</p>
-<button id="app">Avviso appuntamento</button><button id="farmaci">Avviso riordino farmaci</button><button id="lungo">Avviso farmaci: elenco lungo</button><br><button id="img1">Elenco come immagine (una colonna)</button><button id="img2">Elenco come immagine (due colonne)</button>
+<button id="app">Avviso appuntamento</button><button id="farmaci">Avviso riordino farmaci</button><button id="lungo">Avviso farmaci: elenco lungo</button><br><button id="img1">Elenco come immagine (una colonna)</button><button id="img2">Elenco come immagine (due colonne)</button><br><button id="img3a">3 colonne, 4 farmaci a testa</button><button id="img3b">3 colonne, 10 farmaci a testa</button>
 <div id="esito"></div>
 </main>
 <div id="velo"><div id="fin" role="dialog" aria-modal="true">
@@ -52,6 +52,25 @@
   }
   document.getElementById('img1').onclick=function(){mostra('Riordino farmaci · '+totale+' farmaci da ordinare',{body:'Elenco completo nell\'immagine',icon:'assets/icon-192.png',image:immagine(1),tag:'prova-img1',requireInteraction:true,actions:[{action:'elenco',title:'Apri elenco completo'},{action:'rimanda',title:'Rimanda di 12 ore'}]});};
   document.getElementById('img2').onclick=function(){mostra('Riordino farmaci · '+totale+' farmaci da ordinare',{body:'Elenco completo nell\'immagine',icon:'assets/icon-192.png',image:immagine(2),tag:'prova-img2',requireInteraction:true,actions:[{action:'elenco',title:'Apri elenco completo'},{action:'rimanda',title:'Rimanda di 12 ore'}]});};
+  // tre persone, nomi di farmaci generici di esempio (non sono dati del Dossier)
+  var NOMI=['Ramipril 5 mg','Atorvastatina 20 mg','Pantoprazolo 20 mg','Metformina 500 mg','Levotiroxina 75 mcg','Bisoprololo 2,5 mg','Colecalciferolo 25.000 UI','Allopurinolo 100 mg','Acido folico 5 mg','Furosemide 25 mg'];
+  function tre(n){return ['Mario Prova','Anna Prova','Luca Prova'].map(function(nome,k){var l=[];for(var i=0;i<n;i++)l.push([NOMI[(i+k*3)%NOMI.length],(15+((i+k)%9))+'/11']);return [nome,l];});}
+  function immagine3(gruppi){
+    var W=1092,cw=W/3,pad=18,riga=40,top=24;
+    var max=Math.max.apply(null,gruppi.map(function(g){return g[1].length;}));
+    var H=Math.max(Math.round(W/2),top+riga*(max+1)+pad);
+    var c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d');
+    x.fillStyle='#ffffff';x.fillRect(0,0,W,H);
+    gruppi.forEach(function(g,ci){var x0=ci*cw+pad,y=top+riga;
+      if(ci){x.fillStyle='#e3e9ee';x.fillRect(ci*cw,12,2,H-24);}
+      x.fillStyle='#0f766e';x.font='700 32px Segoe UI, sans-serif';x.fillText(g[0],x0,y-6,cw-pad*2);
+      g[1].forEach(function(f){y+=riga;x.fillStyle='#14243a';x.font='500 28px Segoe UI, sans-serif';x.fillText(f[0],x0,y-8,cw-pad*2-78);x.fillStyle='#5b6b7c';x.textAlign='right';x.fillText(f[1],ci*cw+cw-pad,y-8);x.textAlign='left';});});
+    return c.toDataURL('image/png');
+  }
+  function avviso3(n){var g=tre(n);var tot=g.reduce(function(a,b){return a+b[1].length;},0);mostra('Riordino farmaci · '+tot+' farmaci da ordinare',{body:'Elenco completo nell\'immagine',icon:'assets/icon-192.png',image:immagine3(g),tag:'prova-img3',requireInteraction:true,actions:[{action:'elenco',title:'Apri elenco completo'},{action:'rimanda',title:'Rimanda di 12 ore'}]});}
+  document.getElementById('img3a').onclick=function(){avviso3(4);};
+  document.getElementById('img3b').onclick=function(){avviso3(10);};
+  window.__immagine3=function(n){return immagine3(tre(n));};
   document.getElementById('lungo').onclick=function(){mostra('Riordino farmaci · '+totale+' farmaci da ordinare',{body:testoLungo(),icon:'assets/icon-192.png',tag:'prova-lungo',requireInteraction:true,actions:[{action:'elenco',title:'Apri elenco completo'},{action:'rimanda',title:'Rimanda di 12 ore'}]});};
 })();
 </script></body></html>
