@@ -110,6 +110,7 @@ def adatta_google(indirizzo_ritorno):
     s._google_official_client_secret = lambda: web_secret
     carica_originale = s._google_calendar_load_config
     def carica():
+        _migra_google()
         cfg = carica_originale()
         # una configurazione arrivata dall'exe punta all'accesso Desktop: nel browser va quello web
         if str(cfg.get("clientId") or "") in ("", desktop_id):
@@ -120,6 +121,181 @@ def adatta_google(indirizzo_ritorno):
     s._google_calendar_load_config = carica
     # la pagina di Google la apre il ponte nel browser (bridge.js)
     s._open_external_system_browser = lambda url: True
+
+# ---------------------------------------------------------------------------
+# Cifratura dei segreti locali.
+# Nell'exe Windows protegge chiavi e credenziali con DPAPI. Nel browser la
+# chiave del dispositivo e' una chiave AES casuale, conservata dal worker
+# cifrata con una chiave non esportabile del browser (WebCrypto): qui arriva
+# solo in memoria, mai scritta in chiaro.
+_CHIAVE = None
+_PREFISSO = b"web1:"
+_AAD = b"Dossier Sanitario Locale"
+
+def imposta_chiave(chiave):
+    global _CHIAVE
+    chiave = bytes(chiave)
+    if len(chiave) != 32:
+        raise ValueError("chiave del dispositivo non valida")
+    _CHIAVE = chiave
+
+def _proteggi(dati):
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    if _CHIAVE is None:
+        raise RuntimeError("Chiave del dispositivo non disponibile")
+    nonce = os.urandom(12)
+    return _PREFISSO + nonce + AESGCM(_CHIAVE).encrypt(nonce, bytes(dati), _AAD)
+
+def _sproteggi(dati):
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    dati = bytes(dati)
+    if dati.startswith(_PREFISSO):
+        if _CHIAVE is None:
+            raise RuntimeError("Chiave del dispositivo non disponibile")
+        return AESGCM(_CHIAVE).decrypt(dati[5:17], dati[17:], _AAD)
+    # dato salvato prima della cifratura: viene riscritto cifrato al primo salvataggio
+    return dati
+
+def adatta_cifratura():
+    s = motore()
+    s._dpapi_protect = _proteggi
+    s._dpapi_unprotect = _sproteggi
+
+def _migra_google():
+    """Riscrive cifrata la configurazione Google salvata in chiaro prima della cifratura."""
+    s = motore()
+    try:
+        f = s._google_calendar_user_file(s.GOOGLE_CALENDAR_SECRET_FILE)
+        if f.exists() and not f.read_bytes().startswith(_PREFISSO):
+            import json
+            cfg = json.loads(f.read_bytes().decode("utf-8"))
+            if isinstance(cfg, dict):
+                s._google_calendar_save_config(cfg)
+    except Exception as exc:
+        print("configurazione Google non migrata:", exc)
+
+# ---------------------------------------------------------------------------
+# Avvisi del browser.
+# L'exe affida gli avvisi alle Operazioni pianificate di Windows. Qui il motore
+# continua a preparare e salvare gli avvisi con il suo codice; il ponte li
+# legge e la pagina li mostra come notifiche del browser.
+class _OsWindows:
+    """Fa credere al motore di essere su Windows solo dentro le funzioni degli avvisi."""
+    name = "nt"
+    def __init__(self, vero):
+        self._vero = vero
+    def __getattr__(self, nome):
+        return getattr(self._vero, nome)
+
+_AZIONE_FARMACI = None
+_DIALOGO_FARMACI = None
+
+def adatta_avvisi(dati_dir):
+    s = motore()
+    segno = os.path.join(dati_dir, "avvisi_browser.attivo")
+    with open(segno, "w") as fh:
+        fh.write("1")
+    from pathlib import Path
+    s.REMINDER_EXE = Path(segno)
+    s._calendar_run_powershell = lambda script, timeout=30: None
+    for nome in ("_calendar_schedule_event", "_calendar_cancel_event", "_calendar_unregister_task"):
+        originale = getattr(s, nome)
+        def avvolta(*a, _o=originale, **k):
+            vero = s.os
+            s.os = _OsWindows(vero)
+            try:
+                return _o(*a, **k)
+            finally:
+                s.os = vero
+        setattr(s, nome, avvolta)
+    prossimo = s._medication_schedule_next_task
+    def programma(data=None):
+        r = prossimo(data)
+        if r.get("nextAt"):
+            r = {**r, "scheduled": True, "taskName": "avvisi del browser"}
+        return r
+    s._medication_schedule_next_task = programma
+    def dialogo(titolo, testo, multi=False):
+        global _DIALOGO_FARMACI
+        if _AZIONE_FARMACI:
+            return _AZIONE_FARMACI
+        _DIALOGO_FARMACI = {"titolo": titolo, "testo": testo, "multi": bool(multi)}
+        raise RuntimeError("dialogo farmaci: mostrato dal browser")
+    s._medication_task_dialog = dialogo
+
+def _file_mostrati():
+    s = motore()
+    return s.CALENDAR_DIR / "avvisi_browser_mostrati.json"
+
+def promemoria_scaduti():
+    """Gruppi di promemoria arrivati all'ora di avviso e non ancora mostrati."""
+    import datetime, json
+    s = motore()
+    f = _file_mostrati()
+    try:
+        mostrati = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+    except Exception:
+        mostrati = {}
+    adesso = datetime.datetime.now()
+    uscita = []
+    with s.REMINDER_LOCK:
+        gruppi = s._calendar_groups()
+        for nome, g in gruppi.items():
+            if not isinstance(g, dict):
+                continue
+            quando = str(g.get("alertAt") or "")
+            try:
+                ora = datetime.datetime.fromisoformat(quando)
+            except Exception:
+                continue
+            if ora > adesso or mostrati.get(nome) == quando:
+                continue
+            membri = [m for m in (g.get("members") or {}).values() if isinstance(m, dict)]
+            if membri:
+                uscita.append({"id": nome, "alertAt": quando, "messaggi": [str(m.get("message") or "") for m in membri]})
+            mostrati[nome] = quando
+        validi = {k: v for k, v in mostrati.items() if k in gruppi}
+        if uscita or validi != mostrati:
+            s.CALENDAR_DIR.mkdir(parents=True, exist_ok=True)
+            f.write_text(json.dumps(validi), encoding="utf-8")
+    return uscita
+
+def farmaci_da_mostrare():
+    """Esegue il controllo farmaci dell'exe e restituisce il testo del suo dialogo, se c'e'."""
+    global _DIALOGO_FARMACI
+    s = motore()
+    _DIALOGO_FARMACI = None
+    s._medication_agent_main()
+    return _DIALOGO_FARMACI
+
+def farmaci_azione(azione):
+    """Applica 'Acquistato' o 'Rimanda di 12 ore' con lo stesso codice del promemoria dell'exe."""
+    global _AZIONE_FARMACI
+    if azione not in ("purchased", "snooze"):
+        raise ValueError("azione non valida")
+    s = motore()
+    _AZIONE_FARMACI = azione
+    try:
+        return s._medication_agent_main()
+    finally:
+        _AZIONE_FARMACI = None
+
+def _rispondi(stato, dati):
+    import json
+    corpo = json.dumps(dati, ensure_ascii=False).encode("utf-8")
+    return stato, [("Content-Type", "application/json; charset=utf-8")], corpo
+
+def _richiesta_ponte(metodo, percorso, corpo):
+    import json
+    try:
+        if percorso == "/ponte/avvisi" and metodo == "GET":
+            return _rispondi(200, {"ok": True, "promemoria": promemoria_scaduti(), "farmaci": farmaci_da_mostrare()})
+        if percorso == "/ponte/farmaci/azione" and metodo == "POST":
+            dati = json.loads(corpo.decode("utf-8") or "{}")
+            return _rispondi(200, {"ok": True, "esito": farmaci_azione(str(dati.get("azione") or ""))})
+        return _rispondi(404, {"ok": False, "error": "percorso del ponte sconosciuto"})
+    except Exception as exc:
+        return _rispondi(500, {"ok": False, "error": str(exc)})
 
 class _Sock:
     def __init__(self, dati):
@@ -157,8 +333,10 @@ def _dechunk(b):
 
 def richiesta(metodo, percorso, intestazioni, corpo=b""):
     """Esegue una richiesta sull'ApiHandler originale. Ritorna (stato, intestazioni, corpo)."""
-    s = motore()
     corpo = bytes(corpo or b"")
+    if percorso.startswith("/ponte/"):
+        return _richiesta_ponte(metodo, percorso.split("?", 1)[0], corpo)
+    s = motore()
     h = {k.lower(): v for k, v in dict(intestazioni or {}).items()}
     h["host"] = "127.0.0.1:8896"
     h["origin"] = "http://127.0.0.1:8895"
