@@ -2,23 +2,40 @@
 <html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow"><title>Prova avvisi · Clinica Digitale</title>
 <link rel="icon" href="assets/icon-192.png">
-<style>body{font-family:Segoe UI,system-ui,sans-serif;background:#f4f7f9;color:#14243a;margin:0;padding:32px}main{max-width:620px;margin:20px auto;background:#fff;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,.08)}h1{font-size:22px;margin:0 0 8px}p{line-height:1.5}button{font:600 15px Segoe UI,system-ui,sans-serif;border:0;border-radius:12px;padding:12px 18px;margin:6px 8px 6px 0;background:#0f766e;color:#fff;cursor:pointer}#esito{margin-top:16px;padding:12px 14px;border-radius:10px;background:#e6f4f1;min-height:22px}</style></head>
+<style>body{font-family:Segoe UI,system-ui,sans-serif;background:#f4f7f9;color:#14243a;margin:0;padding:32px}main{max-width:620px;margin:20px auto;background:#fff;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,.08)}h1{font-size:22px;margin:0 0 8px}p{line-height:1.5}button{font:600 15px Segoe UI,system-ui,sans-serif;border:0;border-radius:12px;padding:12px 18px;margin:6px 8px 6px 0;background:#0f766e;color:#fff;cursor:pointer}#esito{margin-top:16px;padding:12px 14px;border-radius:10px;background:#e6f4f1;min-height:22px}
+#velo{position:fixed;inset:0;background:rgba(20,36,58,.45);display:none;align-items:center;justify-content:center;padding:16px}#velo.on{display:flex}#fin{background:#fff;border-radius:16px;max-width:560px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)}#fin header{display:flex;gap:12px;align-items:center;padding:18px 22px;border-bottom:1px solid #e3e9ee}#fin header img{width:40px;height:40px}#fin header small{display:block;color:#5b6b7c;font-size:12px;font-weight:600;letter-spacing:.04em}#fin header b{font-size:19px}#fin .corpo{padding:16px 22px}#fin h3{font-size:15px;margin:14px 0 6px}#fin ul{margin:0;padding-left:20px}#fin li{margin:4px 0;line-height:1.4}#fin .nota{font-size:13px;color:#4a5a6a;background:#f4f7f9;border-radius:10px;padding:10px 12px;margin-top:14px;line-height:1.45}#fin footer{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;padding:14px 22px;border-top:1px solid #e3e9ee}#fin footer button{margin:0}#fin .chiaro{background:#fff;color:#14243a;border:1px solid #cfd8e0}</style></head>
 <body><main>
 <h1>Prova degli avvisi del browser</h1>
 <p>Pagina di prova: nessun dato del Dossier viene letto o salvato. Premi un pulsante: la prima volta il browser chiede il permesso di mostrare notifiche.</p>
-<button id="app">Avviso appuntamento</button><button id="farmaci">Avviso riordino farmaci</button>
+<button id="app">Avviso appuntamento</button><button id="farmaci">Avviso riordino farmaci</button><button id="lungo">Avviso farmaci: elenco lungo</button>
 <div id="esito"></div>
 </main>
+<div id="velo"><div id="fin" role="dialog" aria-modal="true">
+<header><img src="assets/icon-192.png" alt=""><div><small>CLINICA DIGITALE</small><b>Riordino farmaci</b></div></header>
+<div class="corpo" id="elenco"></div>
+<footer><button class="chiaro" id="fChiudi">Chiudi</button><button class="chiaro" id="fRimanda">Rimanda di 12 ore</button><button id="fAcq">Tutto acquistato</button></footer>
+</div></div>
 <script>
 (function(){
   var esito=document.getElementById('esito');
   var reg=null;
   if('serviceWorker' in navigator){navigator.serviceWorker.register('sw-avvisi.js').then(function(r){reg=r;}).catch(function(e){esito.textContent='Servizio avvisi non avviato: '+e.message;});
-    navigator.serviceWorker.addEventListener('message',function(e){esito.textContent='Hai premuto: '+e.data;});}
+    navigator.serviceWorker.addEventListener('message',function(e){if(e.data==='elenco'){apriElenco();esito.textContent='Hai premuto: Apri elenco completo';return;}esito.textContent='Hai premuto: '+e.data;});}
+  // elenco di prova: profili e farmaci inventati
+  var FARMACI=[['Mario Prova',[['Farmaco A','15/11/2026'],['Farmaco B','15/11/2026'],['Farmaco C','17/11/2026'],['Farmaco D','18/11/2026']]],['Anna Prova',[['Farmaco E','16/11/2026'],['Farmaco F','19/11/2026']]]];
+  var totale=FARMACI.reduce(function(n,g){return n+g[1].length;},0);
+  function testoLungo(){return FARMACI.map(function(g){return g[0]+'\n'+g[1].map(function(f){return '• '+f[0]+' · nuova scorta necessaria dal '+f[1];}).join('\n');}).join('\n\n');}
+  function apriElenco(){var el=document.getElementById('elenco');el.innerHTML='';FARMACI.forEach(function(g){var h=document.createElement('h3');h.textContent=g[0];el.appendChild(h);var ul=document.createElement('ul');g[1].forEach(function(f){var li=document.createElement('li');li.textContent=f[0]+' · nuova scorta necessaria dal '+f[1];ul.appendChild(li);});el.appendChild(ul);});var n=document.createElement('div');n.className='nota';n.textContent="Conferma 'Tutto acquistato' solo quando tutte le nuove scorte elencate sono realmente disponibili. Se una quantità acquistata è diversa da quella abituale, apri il Dossier per aggiornarla.";el.appendChild(n);document.getElementById('velo').classList.add('on');}
+  function chiudiElenco(scelta){document.getElementById('velo').classList.remove('on');if(scelta)esito.textContent='Nella finestra hai premuto: '+scelta;}
+  document.getElementById('fChiudi').onclick=function(){chiudiElenco('Chiudi');};
+  document.getElementById('fRimanda').onclick=function(){chiudiElenco('Rimanda di 12 ore');};
+  document.getElementById('fAcq').onclick=function(){chiudiElenco('Tutto acquistato');};
+  if(/[?&]elenco=1/.test(location.search))apriElenco();
   function permesso(){if(!('Notification' in window))return Promise.reject(new Error('Questo browser non supporta le notifiche'));if(Notification.permission==='granted')return Promise.resolve();return Notification.requestPermission().then(function(p){if(p!=='granted')throw new Error('Permesso negato: le notifiche si riattivano dalle impostazioni del sito');});}
   function mostra(titolo,opz){permesso().then(function(){return Promise.resolve(reg||navigator.serviceWorker.ready).then(function(r){return r.showNotification(titolo,opz);});}).then(function(){esito.textContent='Avviso inviato: guarda in basso a destra dello schermo.';}).catch(function(e){esito.textContent=e.message;});}
   // stessi testi dell'exe (server.py: _calendar_schedule_event e _medication_agent_main)
   document.getElementById('app').onclick=function(){mostra('Clinica Digitale',{body:'Mario Prova · Visita cardiologica di controllo\n20/11/2026 alle 10:30 · Visita',icon:'assets/icon-192.png',tag:'prova-app',requireInteraction:true});};
   document.getElementById('farmaci').onclick=function(){mostra('Riordino farmaci',{body:'Mario Prova\n• Farmaco di prova · nuova scorta necessaria dal 15/11/2026\n\nConferma \'Acquistato\' solo quando le nuove scorte sono realmente disponibili.',icon:'assets/icon-192.png',tag:'prova-farmaci',requireInteraction:true,actions:[{action:'acquistato',title:'Acquistato'},{action:'rimanda',title:'Rimanda di 12 ore'}]});};
+  document.getElementById('lungo').onclick=function(){mostra('Riordino farmaci · '+totale+' farmaci da ordinare',{body:testoLungo(),icon:'assets/icon-192.png',tag:'prova-lungo',requireInteraction:true,actions:[{action:'elenco',title:'Apri elenco completo'},{action:'rimanda',title:'Rimanda di 12 ore'}]});};
 })();
 </script></body></html>
