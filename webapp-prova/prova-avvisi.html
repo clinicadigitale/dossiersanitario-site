@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><title>Prova avvisi · Clinica Digitale</title>
+<link rel="icon" href="assets/icon-192.png">
+<style>body{font-family:Segoe UI,system-ui,sans-serif;background:#f4f7f9;color:#14243a;margin:0;padding:32px}main{max-width:620px;margin:20px auto;background:#fff;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,.08)}h1{font-size:22px;margin:0 0 8px}p{line-height:1.5}button{font:600 15px Segoe UI,system-ui,sans-serif;border:0;border-radius:12px;padding:12px 18px;margin:6px 8px 6px 0;background:#0f766e;color:#fff;cursor:pointer}#esito{margin-top:16px;padding:12px 14px;border-radius:10px;background:#e6f4f1;min-height:22px}</style></head>
+<body><main>
+<h1>Prova degli avvisi del browser</h1>
+<p>Pagina di prova: nessun dato del Dossier viene letto o salvato. Premi un pulsante: la prima volta il browser chiede il permesso di mostrare notifiche.</p>
+<button id="app">Avviso appuntamento</button><button id="farmaci">Avviso riordino farmaci</button>
+<div id="esito"></div>
+</main>
+<script>
+(function(){
+  var esito=document.getElementById('esito');
+  var reg=null;
+  if('serviceWorker' in navigator){navigator.serviceWorker.register('sw-avvisi.js').then(function(r){reg=r;}).catch(function(e){esito.textContent='Servizio avvisi non avviato: '+e.message;});
+    navigator.serviceWorker.addEventListener('message',function(e){esito.textContent='Hai premuto: '+e.data;});}
+  function permesso(){if(!('Notification' in window))return Promise.reject(new Error('Questo browser non supporta le notifiche'));if(Notification.permission==='granted')return Promise.resolve();return Notification.requestPermission().then(function(p){if(p!=='granted')throw new Error('Permesso negato: le notifiche si riattivano dalle impostazioni del sito');});}
+  function mostra(titolo,opz){permesso().then(function(){return (reg||navigator.serviceWorker.ready).then(function(r){return r.showNotification(titolo,opz);});}).then(function(){esito.textContent='Avviso inviato: guarda in basso a destra dello schermo.';}).catch(function(e){esito.textContent=e.message;});}
+  // stessi testi dell'exe (server.py: _calendar_schedule_event e _medication_agent_main)
+  document.getElementById('app').onclick=function(){mostra('Clinica Digitale',{body:'Mario Prova · Visita cardiologica di controllo\n20/11/2026 alle 10:30 · Visita',icon:'assets/icon-192.png',tag:'prova-app',requireInteraction:true});};
+  document.getElementById('farmaci').onclick=function(){mostra('Riordino farmaci',{body:'Mario Prova\n• Farmaco di prova · nuova scorta necessaria dal 15/11/2026\n\nConferma \'Acquistato\' solo quando le nuove scorte sono realmente disponibili.',icon:'assets/icon-192.png',tag:'prova-farmaci',requireInteraction:true,actions:[{action:'acquistato',title:'Acquistato'},{action:'rimanda',title:'Rimanda di 12 ore'}]});};
+})();
+</script></body></html>
