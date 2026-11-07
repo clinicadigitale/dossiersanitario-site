@@ -7,7 +7,7 @@
 <body><main>
 <h1>Prova degli avvisi del browser</h1>
 <p>Pagina di prova: nessun dato del Dossier viene letto o salvato. Premi un pulsante: la prima volta il browser chiede il permesso di mostrare notifiche.</p>
-<button id="app">Avviso appuntamento</button><button id="farmaci">Avviso riordino farmaci</button><button id="lungo">Avviso farmaci: elenco lungo</button>
+<button id="app">Avviso appuntamento</button><button id="farmaci">Avviso riordino farmaci</button><button id="lungo">Avviso farmaci: elenco lungo</button><br><button id="img1">Elenco come immagine (una colonna)</button><button id="img2">Elenco come immagine (due colonne)</button>
 <div id="esito"></div>
 </main>
 <div id="velo"><div id="fin" role="dialog" aria-modal="true">
@@ -36,6 +36,22 @@
   // stessi testi dell'exe (server.py: _calendar_schedule_event e _medication_agent_main)
   document.getElementById('app').onclick=function(){mostra('Clinica Digitale',{body:'Mario Prova · Visita cardiologica di controllo\n20/11/2026 alle 10:30 · Visita',icon:'assets/icon-192.png',tag:'prova-app',requireInteraction:true});};
   document.getElementById('farmaci').onclick=function(){mostra('Riordino farmaci',{body:'Mario Prova\n• Farmaco di prova · nuova scorta necessaria dal 15/11/2026\n\nConferma \'Acquistato\' solo quando le nuove scorte sono realmente disponibili.',icon:'assets/icon-192.png',tag:'prova-farmaci',requireInteraction:true,actions:[{action:'acquistato',title:'Acquistato'},{action:'rimanda',title:'Rimanda di 12 ore'}]});};
+  // disegna l'elenco completo in un'immagine da mettere dentro l'avviso
+  function immagine(colonne){
+    var W=728,pad=24,riga=34,tit=38;
+    var blocchi=FARMACI.map(function(g){return [g[0]].concat(g[1].map(function(f){return f[0]+' · dal '+f[1];}));});
+    var col=colonne===2?[blocchi.slice(0,1),blocchi.slice(1)]:[blocchi];
+    var righe=Math.max.apply(null,col.map(function(c){return c.reduce(function(n,b){return n+b.length;},0)+(c.length-1)*0.5;}));
+    var H=Math.ceil(pad*2+righe*riga+4);
+    if(colonne===2)H=Math.max(H,Math.round(W/2));
+    var c=document.createElement('canvas');c.width=W;c.height=H;var x=c.getContext('2d');
+    x.fillStyle='#ffffff';x.fillRect(0,0,W,H);
+    var cw=W/col.length;
+    col.forEach(function(cc,ci){var y=pad;cc.forEach(function(b,bi){if(bi)y+=riga*0.5;b.forEach(function(t,ti){y+=riga;x.fillStyle=ti?'#14243a':'#0f766e';x.font=(ti?'500 25px':'700 26px')+' Segoe UI, sans-serif';x.fillText((ti?'• ':'')+t,ci*cw+pad,y-8,cw-pad*1.5);});});});
+    return c.toDataURL('image/png');
+  }
+  document.getElementById('img1').onclick=function(){mostra('Riordino farmaci · '+totale+' farmaci da ordinare',{body:'Elenco completo nell\'immagine',icon:'assets/icon-192.png',image:immagine(1),tag:'prova-img1',requireInteraction:true,actions:[{action:'elenco',title:'Apri elenco completo'},{action:'rimanda',title:'Rimanda di 12 ore'}]});};
+  document.getElementById('img2').onclick=function(){mostra('Riordino farmaci · '+totale+' farmaci da ordinare',{body:'Elenco completo nell\'immagine',icon:'assets/icon-192.png',image:immagine(2),tag:'prova-img2',requireInteraction:true,actions:[{action:'elenco',title:'Apri elenco completo'},{action:'rimanda',title:'Rimanda di 12 ore'}]});};
   document.getElementById('lungo').onclick=function(){mostra('Riordino farmaci · '+totale+' farmaci da ordinare',{body:testoLungo(),icon:'assets/icon-192.png',tag:'prova-lungo',requireInteraction:true,actions:[{action:'elenco',title:'Apri elenco completo'},{action:'rimanda',title:'Rimanda di 12 ore'}]});};
 })();
 </script></body></html>
