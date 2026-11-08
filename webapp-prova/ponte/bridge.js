@@ -10,7 +10,7 @@
   let worker=null,seq=0;const attese=new Map();let pronto=false;
   function avvia(){
     if(worker)return worker;
-    worker=new Worker(base+'engine-worker.js?v=web5');
+    worker=new Worker(base+'engine-worker.js?v=web6');
     worker.onmessage=e=>{const m=e.data||{};
       if(m.tipo==='stato'){mostraStato(m.testo,m.fine,m.errore);if(m.fine)pronto=true;return;}
       const a=attese.get(m.id);if(!a)return;attese.delete(m.id);
@@ -36,6 +36,7 @@
     if(!isMotore(url))return fetchOriginale(input,init);
     let req;try{req=new Request(url,init);}catch(e){return Promise.reject(e);}
     if(input instanceof Request&&!init)req=input;
+    if(isPdf(req))return caratteriPerPdf().then(()=>chiedi(req));
     return chiedi(req);
   };
   // XMLHttpRequest verso il motore (usato da caricamenti e download cloud)
@@ -178,6 +179,66 @@
     ra.prepend(n);
   }
   new MutationObserver(pulsantePermesso).observe(document.documentElement,{childList:true,subtree:true});
+
+  // ---------------------------------------------------------------------
+  // Caratteri del computer per leggere i PDF. Molti referti non contengono i
+  // propri caratteri: l'exe usa quelli di Windows, qui li chiediamo al browser
+  // (Chrome ed Edge) con il permesso della persona. Restano sul dispositivo.
+  const FAMIGLIE=['arial','arial narrow','arial black','times new roman','courier new','tahoma','verdana','symbol','wingdings',
+    'calibri','cambria','georgia','trebuchet ms','segoe ui','century gothic','garamond','book antiqua','bookman old style',
+    'lucida console','lucida sans unicode','microsoft sans serif','consolas','comic sans ms','impact','palatino linotype',
+    'franklin gothic medium','helvetica','helvetica neue','times','courier'];
+  let caratteriFatto=null;
+  const supportaCaratteri=()=>typeof window.queryLocalFonts==='function';
+  async function statoPermessoCaratteri(){
+    if(!supportaCaratteri())return 'unsupported';
+    try{return (await navigator.permissions.query({name:'local-fonts'})).state;}catch(_e){return 'prompt';}
+  }
+  async function inviaCaratteri(){
+    let fonti=[];try{fonti=await window.queryLocalFonts();}catch(_e){return 0;}
+    const scelte=fonti.filter(f=>FAMIGLIE.includes(String(f.family||'').toLowerCase()));
+    const visti=new Set(),lista=[],trasf=[];
+    for(const f of scelte){
+      try{const dati=await (await f.blob()).arrayBuffer();const v=new Uint8Array(dati);
+        const firma=dati.byteLength+':'+Array.from(v.subarray(0,64)).join(',')+':'+Array.from(v.subarray(Math.max(0,v.length-64))).join(',');
+        if(visti.has(firma))continue;visti.add(firma);
+        const tipo=String.fromCharCode(v[0],v[1],v[2],v[3]);const est=tipo==='ttcf'?'.ttc':tipo==='OTTO'?'.otf':'.ttf';
+        lista.push({nome:String(f.postscriptName||('c'+lista.length)).replace(/[^A-Za-z0-9_.-]/g,'_')+est,dati});trasf.push(dati);
+      }catch(_e){}
+    }
+    if(lista.length){avvia();worker.postMessage({tipo:'caratteri',lista},trasf);}
+    return lista.length;
+  }
+  function chiediCaratteri(){
+    return new Promise(fine=>{
+      stileFinestra();const v=document.createElement('div');v.id='ponteFarmaci';
+      v.innerHTML='<div class="fin" role="dialog" aria-modal="true"><header><img alt=""><div><small>CLINICA DIGITALE</small><b>Lettura più precisa dei referti PDF</b></div></header><div class="corpo"><p style="line-height:1.5;margin:12px 0">Molti referti in PDF usano caratteri che non sono inclusi nel file. Se permetti alla webapp di usare i caratteri installati sul tuo computer, i referti vengono letti e interpretati esattamente come nel programma Dossier per Windows.</p><div class="nota">I caratteri restano sul tuo computer: non vengono inviati da nessuna parte. Dopo «Consenti» il browser ti chiederà di confermare.</div></div><footer><button type="button" data-a="no">Non ora</button><button type="button" class="pr" data-a="si">Consenti</button></footer></div>';
+      v.querySelector('img').src=radice+'assets/icon-192.png';
+      v.querySelector('[data-a=no]').onclick=()=>{try{sessionStorage.setItem('ponteCaratteriNonOra','1');}catch(_e){}v.remove();fine(0);};
+      v.querySelector('[data-a=si]').onclick=async()=>{v.querySelectorAll('footer button').forEach(x=>x.disabled=true);
+        const n=await inviaCaratteri();v.remove();
+        if(n)mostraStato('Caratteri del computer attivi per la lettura dei PDF',true);
+        else mostraStato('Permesso dei caratteri non concesso: i PDF vengono letti con i caratteri di base',true,true);
+        fine(n);};
+      document.body.appendChild(v);
+    });
+  }
+  // Prima di analizzare un PDF: se il permesso c'e' gia' i caratteri si caricano da soli,
+  // altrimenti alla prima occasione si spiega a cosa servono.
+  function caratteriPerPdf(){
+    if(caratteriFatto)return caratteriFatto;
+    const p=(async()=>{
+      const st=await statoPermessoCaratteri();
+      if(st==='granted')return inviaCaratteri();
+      if(st!=='prompt')return 0;
+      let nonOra=false;try{nonOra=sessionStorage.getItem('ponteCaratteriNonOra')==='1';}catch(_e){}
+      if(nonOra)return 0;
+      return chiediCaratteri();
+    })().catch(()=>0);
+    caratteriFatto=p.then(n=>{if(!n)caratteriFatto=null;return n;});
+    return caratteriFatto;
+  }
+  const isPdf=req=>{try{const u=new URL(req.url);if(!/^\/api\/ocr(\/start)?$/.test(u.pathname))return false;return /\.pdf$/i.test(decodeURIComponent(req.headers.get('X-File-Name')||''));}catch(_e){return false;}};
 
   let box=null;
   function mostraStato(testo,fine,errore){

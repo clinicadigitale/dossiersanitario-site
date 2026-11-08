@@ -8,7 +8,28 @@ const FILE_MOTORE=['server.py','auth_service.py','license_manager.py','dossier_e
   'vendor/qrcode/image/styles/__init__.py','vendor/qrcode/image/styles/colormasks.py','vendor/qrcode/image/styles/moduledrawers/__init__.py','vendor/qrcode/image/styles/moduledrawers/base.py','vendor/qrcode/image/styles/moduledrawers/pil.py','vendor/qrcode/image/styles/moduledrawers/svg.py'];
 // GitHub Pages esclude le cartelle "vendor" e i file che iniziano con "_": sul sito hanno nomi diversi
 const nomeWeb=f=>f.replace(/^vendor\//,'librerie/').replace(/__init__\.py$/,'init_pkg.py');
-let py=null,ponte=null,pronto=null,coda=Promise.resolve();
+let py=null,ponte=null,pronto=null,coda=Promise.resolve(),BASE='';
+// Lettura dei PDF: PDFium (stessa versione dell'exe, compilato per il browser) e OpenCV,
+// caricati solo quando serve il primo documento. I caratteri del computer arrivano dalla pagina.
+let pdfium=null,caratteriInAttesa=[];
+const RICHIEDE_PDF=/^\/api\/(ocr|doctor-export)/;
+function caricaPdfium(){
+  if(pdfium)return pdfium;
+  pdfium=(async()=>{
+    const dir=BASE+'ponte/pdfium/';
+    importScripts(BASE+'ponte/pdfium_ponte.js?v=web6');
+    const src=await (await fetch(dir+'pdfium.js?v=7947',{cache:'force-cache'})).text();
+    const M=await new Promise((ok,ko)=>{const m={locateFile:p=>dir+p+'?v=7947',onRuntimeInitialized:()=>ok(m),onAbort:ko,print:()=>{},printErr:()=>{}};
+      new Function('Module',src+'\nModule.FS=FS;')(m);});
+    self.pdfiumPonte=creaPdfiumPonte(M,caratteriInAttesa);caratteriInAttesa=[];
+    await py.loadPackage(['opencv-python']);
+    // all'avvio il ponte aveva messo un segnaposto per cv2: ora c'e' quello vero
+    py.runPython("import sys\n_m=sys.modules.get('cv2')\nif _m is not None and not hasattr(_m,'cvtColor'): sys.modules.pop('cv2',None)\nimport cv2");
+    return self.pdfiumPonte;
+  })();
+  pdfium.catch(()=>{pdfium=null;});
+  return pdfium;
+}
 const stato=(testo,fine,errore)=>postMessage({tipo:'stato',testo,fine:!!fine,errore:!!errore});
 // Chiave del dispositivo: AES casuale, salvata cifrata con una chiave del browser
 // non esportabile. Nell'exe questo ruolo e' di DPAPI di Windows.
@@ -26,6 +47,7 @@ async function chiaveDispositivo(){
 }
 function syncfs(daDisco){return new Promise((ok,ko)=>py.FS.syncfs(daDisco,e=>e?ko(e):ok()));}
 async function avvia(base){
+  BASE=base;
   stato('Preparazione del motore del Dossier nel browser…');
   importScripts(PYODIDE+'pyodide.js');
   py=await loadPyodide({indexURL:PYODIDE});
@@ -34,14 +56,15 @@ async function avvia(base){
   py.FS.mkdirTree('/dati');
   py.FS.mount(py.FS.filesystems.IDBFS,{},'/dati');
   await syncfs(true);
-  py.FS.mkdirTree('/motore/vendor/qrcode/image/styles/moduledrawers');py.FS.mkdirTree('/motore/vendor/qrcode/compat');py.FS.mkdirTree('/ponte');
+  py.FS.mkdirTree('/motore/vendor/qrcode/image/styles/moduledrawers');py.FS.mkdirTree('/motore/vendor/qrcode/compat');py.FS.mkdirTree('/ponte/pdfium_web/pypdfium2');
   const scarica=async(url)=>{const r=await fetch(url,{cache:'no-cache'});if(!r.ok)throw new Error('file mancante: '+url);return await r.text();};
   await Promise.all(FILE_MOTORE.map(async f=>{py.FS.writeFile('/motore/'+f,await scarica(base+'python_engine/'+nomeWeb(f)));}));
   py.FS.writeFile('/ponte/ponte_web.py',await scarica(base+'ponte/ponte_web.py'));
+  py.FS.writeFile('/ponte/pdfium_web/pypdfium2/__init__.py',await scarica(base+'ponte/pdfium_web/pypdfium2/'+nomeWeb('__init__.py')));
   // file di configurazione che il motore legge dalla cartella del programma (ROOT = cartella sopra /motore)
   for(const f of ['diagnostics_config.json']){py.FS.writeFile('/'+f,await scarica(base+f));}
   const dek=await chiaveDispositivo();
-  py.runPython("import sys\nsys.path.insert(0,'/ponte')\nimport ponte_web\nponte_web.prepara_ambiente('/dati','/motore')\nponte_web.motore()\nponte_web.adatta_cifratura()");
+  py.runPython("import sys\nsys.path.insert(0,'/ponte')\nsys.path.insert(0,'/ponte/pdfium_web')\nimport ponte_web\nponte_web.prepara_ambiente('/dati','/motore')\nponte_web.motore()\nponte_web.adatta_cifratura()");
   ponte=py.globals.get('ponte_web')||py.pyimport('ponte_web');
   ponte.imposta_chiave(py.toPy(Array.from(dek)));dek.fill(0);
   py.runPython("ponte_web.adatta_google('"+base+"oauth-google.html')\nponte_web.adatta_avvisi('/dati')");
@@ -49,6 +72,7 @@ async function avvia(base){
 }
 async function esegui(m){
   await pronto;
+  if(RICHIEDE_PDF.test(String(m.percorso)))await caricaPdfium();
   const corpo=new Uint8Array(m.corpo||new ArrayBuffer(0));
   const ris=ponte.richiesta(m.metodo,m.percorso,py.toPy(m.intestazioni||{}),py.toPy(corpo));
   const arr=ris.toJs({create_pyproxies:false});ris.destroy&&ris.destroy();
@@ -60,5 +84,9 @@ async function esegui(m){
 }
 onmessage=e=>{const m=e.data||{};
   if(m.tipo==='avvia'){pronto=avvia(m.base).catch(err=>{stato('Il motore del Dossier non si è avviato: '+err.message,true,true);throw err;});return;}
+  // caratteri del computer concessi dalla persona: aggiunti tra una richiesta e l'altra
+  if(m.tipo==='caratteri'){coda=coda.then(async()=>{const lista=(m.lista||[]).map(c=>({nome:c.nome,dati:new Uint8Array(c.dati)}));
+      if(self.pdfiumPonte)self.pdfiumPonte.impostaCaratteri(lista);else caratteriInAttesa.push(...lista);
+      postMessage({tipo:'caratteri',n:lista.length});}).catch(()=>{});return;}
   if(m.tipo==='richiesta'){coda=coda.then(()=>esegui(m)).then(r=>postMessage({id:m.id,...r},[r.corpo])).catch(err=>postMessage({id:m.id,errore:String(err&&err.message||err)}));}
 };
