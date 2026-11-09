@@ -388,11 +388,11 @@ const DossierCloud = (() => {
       await DossierDB.clear('syncQueue');
       const progress=(pct,phase,detail)=>{const rawPct=Math.max(0,Math.min(100,Number(pct)||0));const overall=68+rawPct*.26;updateStatusText(`${phase}${detail?` · ${detail}`:''}`);setCloudProgress(overall,phase,detail);recoveryUi.update(overall,phase,detail);};
       recoveryUi.update(68,'Aggiornamenti successivi','Preparazione dei pacchetti successivi alla copia completa.');
-      // Riproduce tutti i pacchetti confermati, di tutti i dispositivi, fino all'ultimo punto valido del 28/08.
-      const received=await downloadChanges(row,raw,progress,{includeOwn:true,afterMs:0,beforeMs:RECOVERY_SAFE_CUTOFF_MS,strict:true,markAfterCutoffProcessed:true,requiredBatchId:RECOVERY_SAFE_LAST_BATCH});
+      // Riproduce tutti i pacchetti confermati, di tutti i dispositivi, fino all'ultimo disponibile.
+      const received=await downloadChanges(row,raw,progress,{includeOwn:true,afterMs:0,strict:true});
       if(received.deferred)throw new Error(`Recupero cloud incompleto: ${received.deferred} pacchetti non sono stati scaricati.`);
       recoveryUi.update(95,'Verifica finale','Controllo del Dossier ricostruito e preparazione dell’accesso.');
-      row.lastSnapshotAt=snapshotMs?new Date(snapshotMs).toISOString():new Date().toISOString();row.lastSyncAt=new Date().toISOString();row.lastError='';row.recoveryCheckpoint='2026-08-28T18:48:01+02:00';
+      row.lastSnapshotAt=snapshotMs?new Date(snapshotMs).toISOString():new Date().toISOString();row.lastSyncAt=new Date().toISOString();row.lastError='';row.recoveryCheckpoint=new Date().toISOString();
       // Rimane disattivato durante il refresh: eventuali scritture interne non devono diventare modifiche da inviare.
       row.enabled=false;await DossierDB.put('cloudSettings',row,{audit:false,sync:false});settings=row;applySyncContext();await DossierSecurity.registerCurrentDevice();
       if(App.refreshAfterExternalRestore)await App.refreshAfterExternalRestore();
@@ -401,9 +401,9 @@ const DossierCloud = (() => {
       row.enabled=true;await DossierDB.put('cloudSettings',row,{audit:false,sync:false});settings=row;applySyncContext();
       const pendingAfterRecovery=await pendingLocalCount();if(pendingAfterRecovery!==0)throw new Error(`Verifica finale non superata: ${pendingAfterRecovery} modifiche locali risultano ancora in attesa.`);
       await refreshPanel();
-      recoveryCompleted=true;recoveryUi.update(100,'Ripristino completato','Dossier aggiornato al 28/08/2026 ore 18:48 · 0 modifiche locali in attesa.');
+      recoveryCompleted=true;recoveryUi.update(100,'Ripristino completato',`Dossier aggiornato al ${new Date().toLocaleString('it-IT',{dateStyle:'short',timeStyle:'short'})} · 0 modifiche locali in attesa.`);
       await new Promise(r=>setTimeout(r,250));
-      alert(`Ripristino completato fino al 28/08/2026 ore 18:48.\n\nSono stati applicati ${received.applied} aggiornamenti cloud. Le modifiche successive al punto di recupero sono state escluse.\n\nIl Dossier verrà ora chiuso per sicurezza: accedi nuovamente con le tue credenziali.`);
+      alert(`Ripristino completato.\n\nSono stati applicati ${received.applied} aggiornamenti cloud.\n\nIl Dossier verrà ora chiuso per sicurezza: accedi nuovamente con le tue credenziali.`);
       await DossierSecurity.lock('Ripristino cloud completato: accedi nuovamente.');
     }catch(error){
       if(recoveryRow){recoveryRow.enabled=false;recoveryRow.lastError=italianCloudError(error);await DossierDB.put('cloudSettings',recoveryRow,{audit:false,sync:false}).catch(()=>{});settings=recoveryRow;applySyncContext();}

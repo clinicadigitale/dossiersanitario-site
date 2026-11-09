@@ -74,6 +74,70 @@ self.ortEsegui=async(id,nomi,forme,dati,uscite)=>{
   const r=await s.run(feeds,Array.from(uscite));
   return Array.from(uscite).map(n=>{const t=r[n];const d=t.data;return {dims:Array.from(t.dims),data:new Uint8Array(d.buffer,d.byteOffset,d.byteLength)};});
 };
+// ---------------------------------------------------------------------------
+// Cloud: nell'exe i comandi verso MEGA li esegue rclone.exe; qui li esegue il browser
+// con la libreria megajs. Il motore (cloud_web.py) li chiede con cloudOp.
+const MEGA_URL='https://cdn.jsdelivr.net/npm/megajs@1.3.10/dist/main.browser-umd.js';
+const megaSessioni=new Map();
+function libreriaMega(){
+  if(!self.mega||!self.mega.Storage)importScripts(MEGA_URL);
+  if(!self.mega||!self.mega.Storage)throw new Error('Il collegamento a MEGA non si è caricato: controlla la connessione a internet');
+  return self.mega;
+}
+function sessioneMega(user,pass){
+  const k=user+'\n'+pass;let s=megaSessioni.get(k);if(s)return s;
+  s=(async()=>{const M=libreriaMega();const st=new M.Storage({email:user,password:pass,keepalive:true,autologin:true,autoload:true});await st.ready;st.__ricarica=Date.now();return st;})();
+  megaSessioni.set(k,s);s.catch(()=>megaSessioni.delete(k));return s;
+}
+// chiamata compatibile con le due forme della libreria (callback o Promise)
+function chiama(o,m,...a){return new Promise((ok,ko)=>{let fatto=false;const fine=(e,r)=>{if(fatto)return;fatto=true;e?ko(e):ok(r);};let r;try{r=o[m](...a,fine);}catch(e){fine(e);return;}if(r&&typeof r.then==='function')r.then(x=>fine(null,x),e=>fine(e));});}
+const parti=p=>String(p||'').replace(/\\/g,'/').split('/').filter(x=>x&&x!=='.');
+const figli=n=>(n&&Array.isArray(n.children))?n.children:[];
+function ultimo(lista){return lista.slice().sort((a,b)=>(Number(b.timestamp)||0)-(Number(a.timestamp)||0))[0]||null;}
+function trova(st,percorso){let n=st.root;for(const nome of parti(percorso)){if(!n||!n.directory)return null;n=ultimo(figli(n).filter(x=>x.name===nome));}return n||null;}
+const iso=n=>new Date((Number(n.timestamp)||0)*1000).toISOString().replace('.000Z','Z');
+const voce=(n,percorso)=>({Path:percorso,Name:n.name,Size:n.directory?-1:Number(n.size)||0,ModTime:iso(n),IsDir:!!n.directory});
+function elenca(n,{recursive,filesOnly,dirsOnly},prefisso='',out=[]){
+  for(const f of figli(n)){const p=prefisso?prefisso+'/'+f.name:f.name;
+    if(f.directory){if(!filesOnly)out.push(voce(f,p));if(recursive)elenca(f,{recursive,filesOnly,dirsOnly},p,out);}
+    else if(!dirsOnly)out.push(voce(f,p));}
+  return out;
+}
+async function cartella(st,percorso){let n=st.root;for(const nome of parti(percorso)){let c=ultimo(figli(n).filter(x=>x.name===nome&&x.directory));if(!c)c=await chiama(n,'mkdir',nome);n=c;}return n;}
+async function aggiorna(st,forza){if(typeof st.reload!=='function')return;if(forza||Date.now()-(st.__ricarica||0)>5*60*1000){await chiama(st,'reload',true);st.__ricarica=Date.now();}}
+async function cerca(st,percorso){let n=trova(st,percorso);if(!n){await aggiorna(st,true);n=trova(st,percorso);}return n;}
+function nonTrovato(percorso,cartellaAttesa){return {ok:false,code:cartellaAttesa?'notfound_dir':'notfound',error:'non trovato: '+percorso};}
+async function scrivi(st,percorso,dati){
+  const p=parti(percorso),nome=p.pop();const dir=await cartella(st,p.join('/'));
+  const vecchi=figli(dir).filter(x=>x.name===nome&&!x.directory);
+  await dir.upload({name:nome,size:dati.byteLength,allowUploadBuffering:true},dati).complete;
+  for(const v of vecchi){try{await chiama(v,'delete',false);}catch(_e){}}
+}
+async function operazioneMega(op,conn,a,dati){
+  let st;
+  try{st=await sessioneMega(conn.user,conn.pass);}
+  catch(e){const t=String(e&&e.message||e);return {ok:false,code:/ENOENT|EKEY|password|credential|-9|-16/i.test(t)?'auth':'error',error:'Accesso a MEGA non riuscito: '+t};}
+  const percorso=a.path||'';
+  if(op==='about'){const i=await chiama(st,'getAccountInfo');return {ok:true,total:Number(i.spaceTotal)||0,used:Number(i.spaceUsed)||0,free:Math.max(0,(Number(i.spaceTotal)||0)-(Number(i.spaceUsed)||0))};}
+  if(op==='list'){await aggiorna(st,false);const n=percorso?await cerca(st,percorso):st.root;if(!n||!n.directory)return nonTrovato(percorso,true);return {ok:true,items:elenca(n,a)};}
+  if(op==='stat'){const n=percorso?await cerca(st,percorso):st.root;if(!n)return nonTrovato(percorso,false);return {ok:true,item:voce(n,n.name)};}
+  if(op==='read'){const n=await cerca(st,percorso);if(!n||n.directory)return nonTrovato(percorso,false);const b=await chiama(n,'downloadBuffer',{});return {ok:true,data:new Uint8Array(b.buffer,b.byteOffset,b.byteLength)};}
+  if(op==='write'){await scrivi(st,percorso,dati);return {ok:true};}
+  if(op==='mkdir'){await cartella(st,percorso);return {ok:true};}
+  if(op==='delete'){const n=await cerca(st,percorso);if(!n)return nonTrovato(percorso,false);await chiama(n,'delete',false);return {ok:true};}
+  if(op==='copy'||op==='move'){const n=await cerca(st,percorso);if(!n||n.directory)return nonTrovato(percorso,false);
+    const b=await chiama(n,'downloadBuffer',{});await scrivi(st,a.to,new Uint8Array(b.buffer,b.byteOffset,b.byteLength));
+    if(op==='move'){try{await chiama(n,'delete',false);}catch(_e){}}return {ok:true};}
+  return {ok:false,code:'error',error:'operazione cloud non disponibile: '+op};
+}
+self.cloudOp=async(op,connJson,argsJson,dati)=>{
+  const conn=JSON.parse(connJson),a=JSON.parse(argsJson||'{}');
+  const corpo=dati?new Uint8Array(dati):null;
+  try{
+    if(conn.type==='mega')return await operazioneMega(op,conn,a,corpo);
+    return {ok:false,code:'error',error:'Servizio cloud non ancora disponibile nel browser'};
+  }catch(e){const t=String(e&&e.message||e);return {ok:false,code:/not found|ENOENT/i.test(t)?'notfound':'error',error:t};}
+};
 const stato=(testo,fine,errore)=>postMessage({tipo:'stato',testo,fine:!!fine,errore:!!errore});
 // Chiave del dispositivo: AES casuale, salvata cifrata con una chiave del browser
 // non esportabile. Nell'exe questo ruolo e' di DPAPI di Windows.
@@ -105,6 +169,7 @@ async function avvia(base){
   const scarica=async(url)=>{for(let t=0;;t++){try{const r=await fetch(url,{cache:'no-cache'});if(r.ok)return await r.text();if(t>=3)throw new Error('file mancante: '+url);}catch(e){if(t>=3)throw e;}await new Promise(ok=>setTimeout(ok,1500*(t+1)));}};
   await Promise.all(FILE_MOTORE.map(async f=>{py.FS.writeFile('/motore/'+f,await scarica(base+'python_engine/'+nomeWeb(f)));}));
   py.FS.writeFile('/ponte/ponte_web.py',await scarica(base+'ponte/ponte_web.py'));
+  py.FS.writeFile('/ponte/cloud_web.py',await scarica(base+'ponte/cloud_web.py'));
   py.FS.writeFile('/ponte/pdfium_web/pypdfium2/__init__.py',await scarica(base+'ponte/pdfium_web/pypdfium2/'+nomeWeb('__init__.py')));
   // file di configurazione che il motore legge dalla cartella del programma (ROOT = cartella sopra /motore)
   for(const f of ['diagnostics_config.json']){py.FS.writeFile('/'+f,await scarica(base+f));}
@@ -112,7 +177,7 @@ async function avvia(base){
   py.runPython("import sys\nsys.path.insert(0,'/ponte')\nsys.path.insert(0,'/ponte/pdfium_web')\nimport ponte_web\nponte_web.prepara_ambiente('/dati','/motore')\nponte_web.motore()\nponte_web.adatta_cifratura()");
   ponte=py.globals.get('ponte_web')||py.pyimport('ponte_web');
   ponte.imposta_chiave(py.toPy(Array.from(dek)));dek.fill(0);
-  py.runPython("ponte_web.adatta_google('"+base+"oauth-google.html')\nponte_web.adatta_avvisi('/dati')\nponte_web.adatta_esportazioni()");
+  py.runPython("ponte_web.adatta_google('"+base+"oauth-google.html')\nponte_web.adatta_avvisi('/dati')\nponte_web.adatta_esportazioni()\nponte_web.adatta_cloud()");
   stato('Motore del Dossier pronto',true);
 }
 async function esegui(m){

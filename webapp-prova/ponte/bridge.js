@@ -12,7 +12,7 @@
     if(worker)return worker;
     // Il motore parte da un piccolo avvio interno alla pagina: cosi' eredita sempre l'isolamento
     // della pagina (serve per usare piu' processori) senza dipendere dalle intestazioni del file.
-    const avvio=new Blob(["importScripts("+JSON.stringify(base+'engine-worker.js?v=web10')+");"],{type:'text/javascript'});
+    const avvio=new Blob(["importScripts("+JSON.stringify(base+'engine-worker.js?v=web11')+");"],{type:'text/javascript'});
     worker=new Worker(URL.createObjectURL(avvio));
     worker.onmessage=e=>{const m=e.data||{};
       if(m.tipo==='stato'){mostraStato(m.testo,m.fine,m.errore);if(m.fine)pronto=true;return;}
@@ -258,6 +258,15 @@
   const isPdf=req=>{try{const u=new URL(req.url);if(!/^\/api\/ocr(\/start)?$/.test(u.pathname))return false;const nome=decodeURIComponent(req.headers.get('X-File-Name')||'');
     // i PDF creati dalle foto contengono solo immagini: i caratteri non servono
     return /\.pdf$/i.test(nome)&&!/^referto_(fotocamera|scanner)_/i.test(nome);}catch(_e){return false;}};
+
+  // Immagini servite dal motore (per esempio il QR del secondo fattore): un tag <img>
+  // non passa da fetch, quindi il ponte le scarica dal motore e le mostra da qui.
+  function immaginiMotore(radiceNodo){
+    const imgs=radiceNodo.querySelectorAll?radiceNodo.querySelectorAll('img[src*="127.0.0.1:'+PORTA+'"],img[src*="localhost:'+PORTA+'"]'):[];
+    imgs.forEach(img=>{const u=img.getAttribute('src');if(!u||img.dataset.ponte===u)return;img.dataset.ponte=u;
+      window.fetch(u).then(r=>r.ok?r.blob():Promise.reject(new Error(String(r.status)))).then(b=>{if(img.getAttribute('src')===u){img.dataset.ponte=URL.createObjectURL(b);img.src=img.dataset.ponte;}}).catch(()=>{});});
+  }
+  new MutationObserver(ms=>{for(const m of ms){if(m.type==='attributes')immaginiMotore(m.target.parentNode||document);else m.addedNodes.forEach(n=>{if(n.nodeType===1){if(n.tagName==='IMG')immaginiMotore(n.parentNode||document);else immaginiMotore(n);}});}}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
 
   let box=null;
   function mostraStato(testo,fine,errore){

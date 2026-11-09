@@ -333,6 +333,11 @@ def adatta_esportazioni():
 
     s.ApiHandler.handle_media_archive_select = archivio_dicom
 
+def adatta_cloud():
+    """MEGA (e in seguito Google Drive) collegati dal browser al posto di rclone.exe."""
+    import cloud_web
+    cloud_web.adatta(motore(), _proteggi, _sproteggi)
+
 def _rispondi(stato, dati):
     import json
     corpo = json.dumps(dati, ensure_ascii=False).encode("utf-8")
