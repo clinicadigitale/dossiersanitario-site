@@ -72,7 +72,7 @@
     const canale=new BroadcastChannel('dossier-google-oauth');
     canale.onmessage=async e=>{const q=e.data&&e.data.query;if(!q||e.data.tipo!=='ritorno')return;
       let ok=false,testo='';
-      try{const r=await window.fetch('http://127.0.0.1:'+PORTA+'/'+q);ok=r.ok;testo=(await r.text()).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();}catch(err){testo=String(err&&err.message||err);}
+      try{const r=await window.fetch('http://127.0.0.1:'+PORTA+'/?'+q);ok=r.ok;testo=(await r.text()).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();}catch(err){testo=String(err&&err.message||err);}
       canale.postMessage({tipo:'esito',ok,testo});};
   }catch(_e){}
 
