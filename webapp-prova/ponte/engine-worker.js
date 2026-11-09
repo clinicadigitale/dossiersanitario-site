@@ -48,7 +48,7 @@ async function preparaOcr(){
   py.runPython("import sys\nsys.path.insert(0,'/ponte/ocr')\nfor _n in [k for k in list(sys.modules) if k=='rapidocr' or k.startswith('rapidocr.') or k=='onnxruntime' or k.startswith('onnxruntime.')]: sys.modules.pop(_n,None)\nimport dossier_engine as _de\nfrom rapidocr.utils.download_file import DownloadFile as _DF\n_orig=_DF.run.__func__\ndef _run(cls,ip,_o=_orig):\n    import os\n    p=str(ip.save_path)\n    if os.path.exists(p) and os.path.getsize(p)==0:\n        from pyodide.ffi import run_sync\n        import js\n        open(p,'wb').write(bytes(run_sync(js.ortModello(p)).to_py()))\n    return _o(cls,ip)\n_DF.run=classmethod(_run)\nif "+(JSPI?'True':'False')+":\n    import compat_web\n    compat_web.applica()\n_de._RAPID_OCR=None\n_de._RAPID_OCR_ERROR=None if "+(JSPI?'True':'False')+" else 'RapidOCR non disponibile: questo browser non supporta il riconoscimento del testo (serve una versione recente di Chrome o Edge)'");
 }
 function caricaOrt(){
-  if(!ortP){ortP=(async()=>{importScripts(ORT_URL+'ort.wasm.min.js');self.ort.env.wasm.wasmPaths=ORT_URL;self.ort.env.wasm.numThreads=1;self.ort.env.logLevel='error';return self.ort;})();ortP.catch(()=>{ortP=null;});}
+  if(!ortP){ortP=(async()=>{importScripts(ORT_URL+'ort.wasm.min.js');self.ort.env.wasm.wasmPaths=ORT_URL;self.ort.env.wasm.numThreads=self.crossOriginIsolated?Math.max(1,Math.min(8,(navigator.hardwareConcurrency||2)-1)):1;self.ort.env.logLevel='error';return self.ort;})();ortP.catch(()=>{ortP=null;});}
   return ortP;
 }
 // Decodifica JPEG del browser (libjpeg-turbo, come Pillow dell'exe), pixel senza gestione colore

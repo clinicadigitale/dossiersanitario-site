@@ -10,7 +10,7 @@
   let worker=null,seq=0;const attese=new Map();let pronto=false;
   function avvia(){
     if(worker)return worker;
-    worker=new Worker(base+'engine-worker.js?v=web8');
+    worker=new Worker(base+'engine-worker.js?v=web9');
     worker.onmessage=e=>{const m=e.data||{};
       if(m.tipo==='stato'){mostraStato(m.testo,m.fine,m.errore);if(m.fine)pronto=true;return;}
       const a=attese.get(m.id);if(!a)return;attese.delete(m.id);
