@@ -110,11 +110,6 @@
 "modello": true
 },
 {
-"fs": "rapidocr/models/.gitkeep",
-"web": "rapidocr/models/.gitkeep",
-"modello": false
-},
-{
 "fs": "rapidocr/ch_ppocr_det/main.py",
 "web": "rapidocr/ch_ppocr_det/main.py",
 "modello": false

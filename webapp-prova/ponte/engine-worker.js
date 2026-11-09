@@ -38,7 +38,7 @@ const JSPI=typeof WebAssembly!=='undefined'&&(typeof WebAssembly.Suspending==='f
 let manifestoOcr=null,ortP=null;const sessioni=[];
 async function preparaOcr(){
   const dir=BASE+'ponte/ocr/';
-  manifestoOcr=await (await fetch(dir+'manifest.json?v=ocr1',{cache:'no-cache'})).json();
+  manifestoOcr=await (await fetch(dir+'manifest.json?v=ocr2',{cache:'no-cache'})).json();
   await Promise.all(manifestoOcr.map(async m=>{
     const dest='/ponte/ocr/'+m.fs;py.FS.mkdirTree(dest.slice(0,dest.lastIndexOf('/')));
     if(m.modello){py.FS.writeFile(dest,new Uint8Array(0));return;}
