@@ -5228,6 +5228,17 @@ const App = (() => {
     };
   }
 
+  // Riquadro dello stato del motore. Nella webapp il motore si prepara nel browser:
+  // finche' il primo controllo non e' finito il riquadro dice che la verifica e' in corso.
+  function ocrHealthBoxHtmlWeb(){
+    const h=state.ocrHealth||{};const ready=h.ocrAvailable||h.nativePdfAvailable||h.ocrDeferred;
+    if(!ready&&h.checking)return `<div class="ocr-health"><strong>Verifica del motore del Dossier in corso</strong><span>Puoi già scegliere i documenti: l’analisi parte appena il motore è pronto.</span></div>`;
+    return `<div class="ocr-health ${ready?'ok':'error'}"><strong>${ready?'Motore del Dossier disponibile':'Motore del Dossier non disponibile'}</strong><span>${esc(h.engine||'Motore Python locale')}${h.nativePdfAvailable?' · lettura PDF attiva':' · motore PDF non disponibile'}</span></div>`;
+  }
+  function refreshOcrHealthBoxWeb(){
+    if(state.ocrHealth?.ok)return;
+    void OCRService.health(true).then(h=>{state.ocrHealth=h;const box=document.querySelector('#modal .ocr-health');if(box)box.outerHTML=ocrHealthBoxHtmlWeb();}).catch(()=>{});
+  }
   async function openImportModal(options={}) {
     if (!activeProfile()) return;
     state.importOptions=(options&&!(options instanceof Event))?options:{};
@@ -5235,12 +5246,13 @@ const App = (() => {
     openModal(state.importOptions.preferredCategory?`Importa ${state.importOptions.preferredCategory.toLowerCase()}`:'Importa e analizza documenti',`Profilo: ${activeProfile().firstName} ${activeProfile().lastName}`,`
       <div class="import-workspace">
         <div class="file-drop" id="fileDrop"><strong>Acquisisci referti e documenti sanitari</strong><p class="kpi-note">${globalThis.FotoDocumento?.isTelefono?.()?'Puoi caricare file o fotografare più pagine.':'Puoi caricare uno o più file.'} L’analisi parte automaticamente e i campi secondari restano facoltativi.</p><input id="fileInput" type="file" multiple accept="application/pdf,image/jpeg,image/png,image/bmp,image/tiff" class="hidden"><input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden"><div class="acquisition-buttons"><button type="button" id="chooseFilesBtn" class="btn btn-primary">Scegli file</button><button type="button" id="cameraBtn" class="btn btn-light">Fotocamera multipagina</button><button type="button" id="scannerBtn" class="btn btn-light">Scanner locale</button></div><small>Per PDF con testo digitale il programma usa prima l’estrazione nativa, quando il componente è installato; le scansioni usano OCR locale a 3 passaggi.</small></div>
-        <div class="ocr-health ${(state.ocrHealth.ocrAvailable||state.ocrHealth.nativePdfAvailable||state.ocrHealth.ocrDeferred)?'ok':'error'}"><strong>${(state.ocrHealth.ocrAvailable||state.ocrHealth.nativePdfAvailable||state.ocrHealth.ocrDeferred)?'Motore del Dossier disponibile':'Motore del Dossier non disponibile'}</strong><span>${esc(state.ocrHealth.engine||'Motore Python locale')}${state.ocrHealth.nativePdfAvailable?' · lettura PDF attiva':' · motore PDF non disponibile'}</span></div>
+        ${ocrHealthBoxHtmlWeb()}
         <div id="queueSummary"></div>
         <div id="importQueue" class="import-queue"></div>
         <div class="form-actions sticky-actions"><button type="button" class="btn btn-light" id="cancelModalBtn">Annulla</button><button type="button" class="btn btn-light" id="retryOcrBtn">Rianalizza errori</button><button type="button" class="btn btn-primary" id="archiveQueueBtn">Attendi analisi</button></div>
       </div>`);
     $('#cancelModalBtn').onclick=closeModal;
+    refreshOcrHealthBoxWeb();
     $('#chooseFilesBtn').onclick=()=>$('#fileInput').click();
     $('#cameraBtn').onclick=()=>openCameraCapture({single:false,onComplete:addImportFiles});
     $('#scannerBtn').onclick=acquireFromScannerForQueue;

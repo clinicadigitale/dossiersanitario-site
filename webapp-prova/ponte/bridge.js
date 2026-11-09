@@ -10,7 +10,10 @@
   let worker=null,seq=0;const attese=new Map();let pronto=false;
   function avvia(){
     if(worker)return worker;
-    worker=new Worker(base+'engine-worker.js?v=web10');
+    // Il motore parte da un piccolo avvio interno alla pagina: cosi' eredita sempre l'isolamento
+    // della pagina (serve per usare piu' processori) senza dipendere dalle intestazioni del file.
+    const avvio=new Blob(["importScripts("+JSON.stringify(base+'engine-worker.js?v=web10')+");"],{type:'text/javascript'});
+    worker=new Worker(URL.createObjectURL(avvio));
     worker.onmessage=e=>{const m=e.data||{};
       if(m.tipo==='stato'){mostraStato(m.testo,m.fine,m.errore);if(m.fine)pronto=true;return;}
       const a=attese.get(m.id);if(!a)return;attese.delete(m.id);
@@ -98,6 +101,10 @@
   }
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register(radice+'sw-dossier.js',{scope:radice}).then(r=>{regAvvisi=r;}).catch(err=>console.warn('Avvisi del browser non attivati:',err));
+    // Alla prima apertura la pagina non e' ancora isolata: appena il servizio e' attivo si ricarica una volta sola
+    if(!window.crossOriginIsolated&&!navigator.serviceWorker.controller){
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{let gia=false;try{gia=sessionStorage.getItem('ponteIsolamento')==='1';sessionStorage.setItem('ponteIsolamento','1');}catch(_e){gia=true;}if(!gia)location.reload();},{once:true});
+    }
     navigator.serviceWorker.addEventListener('message',e=>{const d=e.data||{};if(d.fonte!=='dossier-avvisi')return;
       if(d.azione==='elenco'&&ultimoFarmaci&&accessoAttivo())apriFinestraFarmaci(ultimoFarmaci);
       if(d.azione==='rimanda')azioneFarmaci('snooze');});
