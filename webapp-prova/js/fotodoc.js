@@ -310,5 +310,7 @@
     });
   }
 
+  // Su computer la fotografia non serve (le webcam non sono adatte ai documenti): i tasti si nascondono
+  try{if(!isTelefono())document.documentElement.classList.add('dispositivo-computer');}catch(_e){}
   window.FotoDocumento={isTelefono,acquisisci,_prova:{rileva:(rgba,w,h)=>calcola({tipo:'rileva',w,h,rgba:rgba.buffer},[rgba.buffer]),elabora:(rgba,w,h,quad,migliora)=>calcola({tipo:'elabora',w,h,rgba:rgba.buffer,quad,lato:LATO_MAX_USCITA,migliora},[rgba.buffer])}};
 })();

@@ -6451,3 +6451,4 @@ html,body{background:#eef4f9;color:#173956}
 
 /* webapp: lo scanner non si comanda dal browser, il tasto spiega come fare */
 #scannerBtn,#calendarBookingScannerBtn,[data-action^="scanner-card-"]{opacity:.55}
+.dispositivo-computer #cameraBtn,.dispositivo-computer #calendarBookingCameraBtn,.dispositivo-computer [data-action^="camera-card-"]{display:none!important}
