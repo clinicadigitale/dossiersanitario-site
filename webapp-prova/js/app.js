@@ -6212,7 +6212,8 @@ const App = (() => {
   }
 
   async function chooseBackupDestination(fileName){
-    if(typeof window.showSaveFilePicker!=='function')throw new Error('La finestra Windows “Salva con nome” non è disponibile in questo ambiente. Riavvia Clinica Digitale dall’icona del programma e riprova.');
+    // Browser senza la finestra "Salva con nome" (telefono, Firefox, Safari): il backup viene scaricato
+    if(typeof window.showSaveFilePicker!=='function')return {download:fileName};
     try{
       return await window.showSaveFilePicker({
         id:'clinica-digitale-backup-completo',
@@ -6223,6 +6224,7 @@ const App = (() => {
     }catch(error){if(error?.name==='AbortError')return null;throw error;}
   }
   async function writeBackupToDestination(handle,blob){
+    if(handle?.download){downloadBlob(blob,handle.download);return;}
     const writable=await handle.createWritable();
     try{await writable.write(blob);await writable.close();}
     catch(error){try{await writable.abort?.();}catch{}throw error;}
@@ -6242,7 +6244,7 @@ const App = (() => {
         const blob=await buildBackupBlob();
         await writeBackupToDestination(destination,blob);
         localStorage.setItem('lastBackupAt',new Date().toISOString());
-        toast('Backup verificato e salvato nella cartella scelta');
+        toast(destination.download?'Backup verificato e scaricato nella cartella Download del browser':'Backup verificato e salvato nella cartella scelta');
         if(state.activeView==='backup')renderBackup();
       }catch(error){toast(`Backup non completato: ${error.message}`);if(state.activeView==='backup')renderBackup();}
       finally{buttons().forEach(b=>{b.disabled=false;b.setAttribute('aria-busy','false');});}
