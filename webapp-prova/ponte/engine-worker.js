@@ -22,14 +22,58 @@ function caricaPdfium(){
     const M=await new Promise((ok,ko)=>{const m={locateFile:p=>dir+p+'?v=7947',onRuntimeInitialized:()=>ok(m),onAbort:ko,print:()=>{},printErr:()=>{}};
       new Function('Module',src+'\nModule.FS=FS;')(m);});
     self.pdfiumPonte=creaPdfiumPonte(M,caratteriInAttesa);caratteriInAttesa=[];
-    await py.loadPackage(['opencv-python']);
+    await py.loadPackage(['opencv-python','pyclipper','shapely','pyyaml','requests','tqdm']);
     // all'avvio il ponte aveva messo un segnaposto per cv2: ora c'e' quello vero
     py.runPython("import sys\n_m=sys.modules.get('cv2')\nif _m is not None and not hasattr(_m,'cvtColor'): sys.modules.pop('cv2',None)\nimport cv2");
+    await preparaOcr();
     return self.pdfiumPonte;
   })();
   pdfium.catch(()=>{pdfium=null;});
   return pdfium;
 }
+// OCR: RapidOCR dell'exe (stessi modelli) con onnxruntime-web al posto di onnxruntime.
+// I file Python arrivano subito, i modelli (circa 31 MB) solo alla prima foto o scansione.
+const ORT_URL='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/';
+const JSPI=typeof WebAssembly!=='undefined'&&(typeof WebAssembly.Suspending==='function'||typeof WebAssembly.Suspender==='function');
+let manifestoOcr=null,ortP=null;const sessioni=[];
+async function preparaOcr(){
+  const dir=BASE+'ponte/ocr/';
+  manifestoOcr=await (await fetch(dir+'manifest.json?v=ocr1',{cache:'no-cache'})).json();
+  await Promise.all(manifestoOcr.map(async m=>{
+    const dest='/ponte/ocr/'+m.fs;py.FS.mkdirTree(dest.slice(0,dest.lastIndexOf('/')));
+    if(m.modello){py.FS.writeFile(dest,new Uint8Array(0));return;}
+    const r=await fetch(dir+m.web+'?v=ocr1',{cache:'no-cache'});if(!r.ok)throw new Error('file OCR mancante: '+m.web);
+    py.FS.writeFile(dest,new Uint8Array(await r.arrayBuffer()));}));
+  // all'avvio il ponte aveva messo dei segnaposto per rapidocr: ora ci sono quelli veri
+  py.runPython("import sys\nsys.path.insert(0,'/ponte/ocr')\nfor _n in [k for k in list(sys.modules) if k=='rapidocr' or k.startswith('rapidocr.') or k=='onnxruntime' or k.startswith('onnxruntime.')]: sys.modules.pop(_n,None)\nimport dossier_engine as _de\nfrom rapidocr.utils.download_file import DownloadFile as _DF\n_orig=_DF.run.__func__\ndef _run(cls,ip,_o=_orig):\n    import os\n    p=str(ip.save_path)\n    if os.path.exists(p) and os.path.getsize(p)==0:\n        from pyodide.ffi import run_sync\n        import js\n        open(p,'wb').write(bytes(run_sync(js.ortModello(p)).to_py()))\n    return _o(cls,ip)\n_DF.run=classmethod(_run)\nif "+(JSPI?'True':'False')+":\n    import compat_web\n    compat_web.applica()\n_de._RAPID_OCR=None\n_de._RAPID_OCR_ERROR=None if "+(JSPI?'True':'False')+" else 'RapidOCR non disponibile: questo browser non supporta il riconoscimento del testo (serve una versione recente di Chrome o Edge)'");
+}
+function caricaOrt(){
+  if(!ortP){ortP=(async()=>{importScripts(ORT_URL+'ort.wasm.min.js');self.ort.env.wasm.wasmPaths=ORT_URL;self.ort.env.wasm.numThreads=1;self.ort.env.logLevel='error';return self.ort;})();ortP.catch(()=>{ortP=null;});}
+  return ortP;
+}
+// Decodifica JPEG del browser (libjpeg-turbo, come Pillow dell'exe), pixel senza gestione colore
+self.decodificaJpeg=async dati=>{
+  const bmp=await createImageBitmap(new Blob([new Uint8Array(dati)],{type:'image/jpeg'}),{colorSpaceConversion:'none',premultiplyAlpha:'none',imageOrientation:'none'});
+  const c=new OffscreenCanvas(bmp.width,bmp.height);const x=c.getContext('2d',{colorSpace:'srgb',willReadFrequently:true});
+  x.drawImage(bmp,0,0);const px=x.getImageData(0,0,bmp.width,bmp.height).data;bmp.close();
+  return {w:c.width,h:c.height,data:new Uint8Array(px.buffer,px.byteOffset,px.byteLength)};
+};
+self.ortModello=async percorso=>{
+  const fs=String(percorso).replace(/^\/ponte\/ocr\//,'');const m=(manifestoOcr||[]).find(x=>x.fs===fs);
+  if(!m)throw new Error('modello OCR sconosciuto: '+fs);
+  const r=await fetch(BASE+'ponte/ocr/'+m.web+'?v=ocr1',{cache:'force-cache'});if(!r.ok)throw new Error('modello OCR non scaricato: '+m.web);
+  return new Uint8Array(await r.arrayBuffer());
+};
+self.ortCrea=async dati=>{
+  const o=await caricaOrt();const s=await o.InferenceSession.create(new Uint8Array(dati),{executionProviders:['wasm'],graphOptimizationLevel:'all'});
+  sessioni.push(s);return {id:sessioni.length-1,inputNames:Array.from(s.inputNames),outputNames:Array.from(s.outputNames)};
+};
+self.ortEsegui=async(id,nomi,forme,dati,uscite)=>{
+  const o=await caricaOrt();const s=sessioni[id];const feeds={};
+  Array.from(nomi).forEach((n,i)=>{const u=new Uint8Array(dati[i]);feeds[n]=new o.Tensor('float32',new Float32Array(u.buffer,u.byteOffset,u.byteLength/4),Array.from(forme[i]).map(Number));});
+  const r=await s.run(feeds,Array.from(uscite));
+  return Array.from(uscite).map(n=>{const t=r[n];const d=t.data;return {dims:Array.from(t.dims),data:new Uint8Array(d.buffer,d.byteOffset,d.byteLength)};});
+};
 const stato=(testo,fine,errore)=>postMessage({tipo:'stato',testo,fine:!!fine,errore:!!errore});
 // Chiave del dispositivo: AES casuale, salvata cifrata con una chiave del browser
 // non esportabile. Nell'exe questo ruolo e' di DPAPI di Windows.
@@ -74,7 +118,9 @@ async function esegui(m){
   await pronto;
   if(RICHIEDE_PDF.test(String(m.percorso)))await caricaPdfium();
   const corpo=new Uint8Array(m.corpo||new ArrayBuffer(0));
-  const ris=ponte.richiesta(m.metodo,m.percorso,py.toPy(m.intestazioni||{}),py.toPy(corpo));
+  // con JSPI il motore puo' attendere onnxruntime-web (asincrono) come se fosse sincrono
+  const args=[m.metodo,m.percorso,py.toPy(m.intestazioni||{}),py.toPy(corpo)];
+  const ris=JSPI?await ponte.richiesta.callPromising(...args):ponte.richiesta(...args);
   const arr=ris.toJs({create_pyproxies:false});ris.destroy&&ris.destroy();
   const [status,hh,dati]=arr;
   const intestazioni=[];for(const x of hh){intestazioni.push([String(x[0]),String(x[1])]);}

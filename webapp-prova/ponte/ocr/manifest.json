@@ -1,0 +1,297 @@
+[
+{
+"fs": "warp5.py",
+"web": "warp5.py",
+"modello": false
+},
+{
+"fs": "compat_web.py",
+"web": "compat_web.py",
+"modello": false
+},
+{
+"fs": "typing_extensions.py",
+"web": "typing_extensions.py",
+"modello": false
+},
+{
+"fs": "onnxruntime/__init__.py",
+"web": "onnxruntime/u__init__.py",
+"modello": false
+},
+{
+"fs": "rapidocr/cli.py",
+"web": "rapidocr/cli.py",
+"modello": false
+},
+{
+"fs": "rapidocr/main.py",
+"web": "rapidocr/main.py",
+"modello": false
+},
+{
+"fs": "rapidocr/__init__.py",
+"web": "rapidocr/u__init__.py",
+"modello": false
+},
+{
+"fs": "rapidocr/_version.py",
+"web": "rapidocr/u_version.py",
+"modello": false
+},
+{
+"fs": "rapidocr/default_models.yaml",
+"web": "rapidocr/default_models.yaml",
+"modello": false
+},
+{
+"fs": "rapidocr/config.yaml",
+"web": "rapidocr/config.yaml",
+"modello": false
+},
+{
+"fs": "rapidocr/cal_rec_boxes/main.py",
+"web": "rapidocr/cal_rec_boxes/main.py",
+"modello": false
+},
+{
+"fs": "rapidocr/cal_rec_boxes/__init__.py",
+"web": "rapidocr/cal_rec_boxes/u__init__.py",
+"modello": false
+},
+{
+"fs": "rapidocr/ch_ppocr_rec/main.py",
+"web": "rapidocr/ch_ppocr_rec/main.py",
+"modello": false
+},
+{
+"fs": "rapidocr/ch_ppocr_rec/typings.py",
+"web": "rapidocr/ch_ppocr_rec/typings.py",
+"modello": false
+},
+{
+"fs": "rapidocr/ch_ppocr_rec/__init__.py",
+"web": "rapidocr/ch_ppocr_rec/u__init__.py",
+"modello": false
+},
+{
+"fs": "rapidocr/ch_ppocr_rec/utils.py",
+"web": "rapidocr/ch_ppocr_rec/utils.py",
+"modello": false
+},
+{
+"fs": "rapidocr/ch_ppocr_cls/main.py",
+"web": "rapidocr/ch_ppocr_cls/main.py",
+"modello": false
+},
+{
+"fs": "rapidocr/ch_ppocr_cls/__init__.py",
+"web": "rapidocr/ch_ppocr_cls/u__init__.py",
+"modello": false
+},
+{
+"fs": "rapidocr/ch_ppocr_cls/utils.py",
+"web": "rapidocr/ch_ppocr_cls/utils.py",
+"modello": false
+},
+{
+"fs": "rapidocr/models/ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+"web": "rapidocr/models/ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+"modello": true
+},
+{
+"fs": "rapidocr/models/PP-OCRv6_det_small.onnx",
+"web": "rapidocr/models/PP-OCRv6_det_small.onnx",
+"modello": true
+},
+{
+"fs": "rapidocr/models/PP-OCRv6_rec_small.onnx",
+"web": "rapidocr/models/PP-OCRv6_rec_small.onnx",
+"modello": true
+},
+{
+"fs": "rapidocr/models/.gitkeep",
+"web": "rapidocr/models/.gitkeep",
+"modello": false
+},
+{
+"fs": "rapidocr/ch_ppocr_det/main.py",
+"web": "rapidocr/ch_ppocr_det/main.py",
+"modello": false
+},
+{
+"fs": "rapidocr/ch_ppocr_det/__init__.py",
+"web": "rapidocr/ch_ppocr_det/u__init__.py",
+"modello": false
+},
+{
+"fs": "rapidocr/ch_ppocr_det/utils.py",
+"web": "rapidocr/ch_ppocr_det/utils.py",
+"modello": false
+},
+{
+"fs": "rapidocr/inference_engine/base.py",
+"web": "rapidocr/inference_engine/base.py",
+"modello": false
+},
+{
+"fs": "rapidocr/inference_engine/__init__.py",
+"web": "rapidocr/inference_engine/u__init__.py",
+"modello": false
+},
+{
+"fs": "rapidocr/inference_engine/onnxruntime/main.py",
+"web": "rapidocr/inference_engine/onnxruntime/main.py",
+"modello": false
+},
+{
+"fs": "rapidocr/inference_engine/onnxruntime/__init__.py",
+"web": "rapidocr/inference_engine/onnxruntime/u__init__.py",
+"modello": false
+},
+{
+"fs": "rapidocr/inference_engine/onnxruntime/provider_config.py",
+"web": "rapidocr/inference_engine/onnxruntime/provider_config.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/typings.py",
+"web": "rapidocr/utils/typings.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/download_file.py",
+"web": "rapidocr/utils/download_file.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/parse_parameters.py",
+"web": "rapidocr/utils/parse_parameters.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/output.py",
+"web": "rapidocr/utils/output.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/log.py",
+"web": "rapidocr/utils/log.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/__init__.py",
+"web": "rapidocr/utils/u__init__.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/process_img.py",
+"web": "rapidocr/utils/process_img.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/to_markdown.py",
+"web": "rapidocr/utils/to_markdown.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/to_json.py",
+"web": "rapidocr/utils/to_json.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/load_image.py",
+"web": "rapidocr/utils/load_image.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/vis_res.py",
+"web": "rapidocr/utils/vis_res.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/download_models.py",
+"web": "rapidocr/utils/download_models.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/model_resolver.py",
+"web": "rapidocr/utils/model_resolver.py",
+"modello": false
+},
+{
+"fs": "rapidocr/utils/utils.py",
+"web": "rapidocr/utils/utils.py",
+"modello": false
+},
+{
+"fs": "omegaconf/dictconfig.py",
+"web": "omegaconf/dictconfig.py",
+"modello": false
+},
+{
+"fs": "omegaconf/errors.py",
+"web": "omegaconf/errors.py",
+"modello": false
+},
+{
+"fs": "omegaconf/listconfig.py",
+"web": "omegaconf/listconfig.py",
+"modello": false
+},
+{
+"fs": "omegaconf/base.py",
+"web": "omegaconf/base.py",
+"modello": false
+},
+{
+"fs": "omegaconf/nodes.py",
+"web": "omegaconf/nodes.py",
+"modello": false
+},
+{
+"fs": "omegaconf/__init__.py",
+"web": "omegaconf/u__init__.py",
+"modello": false
+},
+{
+"fs": "omegaconf/basecontainer.py",
+"web": "omegaconf/basecontainer.py",
+"modello": false
+},
+{
+"fs": "omegaconf/omegaconf.py",
+"web": "omegaconf/omegaconf.py",
+"modello": false
+},
+{
+"fs": "omegaconf/_utils.py",
+"web": "omegaconf/u_utils.py",
+"modello": false
+},
+{
+"fs": "omegaconf/version.py",
+"web": "omegaconf/version.py",
+"modello": false
+},
+{
+"fs": "colorlog/__init__.py",
+"web": "colorlog/u__init__.py",
+"modello": false
+},
+{
+"fs": "colorlog/wrappers.py",
+"web": "colorlog/wrappers.py",
+"modello": false
+},
+{
+"fs": "colorlog/escape_codes.py",
+"web": "colorlog/escape_codes.py",
+"modello": false
+},
+{
+"fs": "colorlog/formatter.py",
+"web": "colorlog/formatter.py",
+"modello": false
+}
+]
