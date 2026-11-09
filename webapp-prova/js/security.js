@@ -135,8 +135,16 @@ const DossierSecurity = (() => {
 
   function ensureDevice(){
     try{device=JSON.parse(localStorage.getItem('dossierDeviceV5RC5')||'null');}catch{device=null;}
-    if(!device?.id){device={id:randomId('device'),name:'Questo computer',createdAt:new Date().toISOString(),lastSeenAt:new Date().toISOString(),revokedAt:''};}
+    if(!device?.id){device={id:randomId('device'),name:'Questo dispositivo',createdAt:new Date().toISOString(),lastSeenAt:new Date().toISOString(),revokedAt:''};}
     device.lastSeenAt=new Date().toISOString();localStorage.setItem('dossierDeviceV5RC5',JSON.stringify(device));return device;
+  }
+
+  // webapp: sistema e browser di questo dispositivo, al posto di "Windows" dell'exe
+  function descriviDispositivo(){
+    const ua=navigator.userAgent||'';const p=String(navigator.userAgentData?.platform||'');
+    const so=/win/i.test(p)||/Windows/.test(ua)?'Windows':/mac/i.test(p)||/Macintosh/.test(ua)?'macOS':/android/i.test(p)||/Android/.test(ua)?'Android':/iPhone|iPad|iOS/.test(ua)?'iPhone/iPad':/linux|cros/i.test(p+ua)?'Linux':'dispositivo';
+    const br=/Edg\//.test(ua)?'Edge':/OPR\//.test(ua)?'Opera':/Firefox\//.test(ua)?'Firefox':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':'browser';
+    return `${br} su ${so}`;
   }
 
   function currentDeviceSummary(){
@@ -145,7 +153,7 @@ const DossierSecurity = (() => {
       const parsed=new Date(device.createdAt);
       if(!Number.isNaN(parsed.getTime()))registered=` · registrato il ${parsed.toLocaleDateString('it-IT')}`;
     }
-    return `Windows${registered}`;
+    return `${descriviDispositivo()}${registered}`;
   }
 
   async function getSecuritySettings(){

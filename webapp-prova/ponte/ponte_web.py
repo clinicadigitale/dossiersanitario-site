@@ -280,6 +280,59 @@ def farmaci_azione(azione):
     finally:
         _AZIONE_FARMACI = None
 
+# ---------------------------------------------------------------------------
+# Esportazioni (versione per medico, visita su memoria esterna): nell'exe si sceglie
+# una cartella con la finestra di Windows e il motore ci scrive i file. Nella webapp
+# il motore scrive gli stessi file in una cartella temporanea del browser e alla fine
+# li consegna come un unico file ZIP da scaricare.
+_ESPORTAZIONI = {}
+
+def adatta_esportazioni():
+    import io, secrets, shutil, zipfile
+    from pathlib import Path
+    s = motore()
+    radice = Path("/tmp/esportazioni")
+
+    def scegli_cartella():
+        d = radice / secrets.token_hex(6)
+        d.mkdir(parents=True, exist_ok=True)
+        return str(d)
+
+    s._doctor_select_parent_folder = scegli_cartella
+    s._visit_external_destination = lambda parent: (True, "")
+
+    def completa(self):
+        try:
+            data = self.read_json(max_size=32 * 1024)
+            export_id = str(data.get("exportId") or "")
+            with s.DOCTOR_EXPORT_LOCK:
+                row = s.DOCTOR_EXPORT_SESSIONS.pop(export_id, None)
+            root = Path(str((row or {}).get("root") or "/nessuna"))
+            info = {"ok": True, "folderPath": str(root), "files": int((row or {}).get("files", 0))}
+            if row and root.is_dir():
+                buf = io.BytesIO()
+                with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+                    for f in sorted(root.rglob("*")):
+                        if f.is_file():
+                            z.write(f, arcname=str(Path(root.name) / f.relative_to(root)))
+                nome = root.name + ".zip"
+                did = secrets.token_hex(8)
+                _ESPORTAZIONI[did] = (nome, buf.getvalue())
+                shutil.rmtree(root.parent, ignore_errors=True)
+                info.update(folderPath=nome, download="/ponte/esportazione/" + did, downloadName=nome)
+            self.send_json(200, info)
+        except Exception as exc:
+            self.send_json(500, {"ok": False, "error": str(exc)})
+
+    s.ApiHandler.handle_doctor_export_complete = completa
+
+    # L'Archivio DICOM nella webapp usa una cartella del computer scelta nel browser:
+    # finche' non e' collegato, la scelta della cartella dal motore non e' disponibile.
+    def archivio_dicom(self):
+        self.send_json(409, {"ok": False, "error": "La cartella dell'Archivio DICOM si sceglie dal browser: funzione in preparazione nella versione web.", "code": "web_media_archive"})
+
+    s.ApiHandler.handle_media_archive_select = archivio_dicom
+
 def _rispondi(stato, dati):
     import json
     corpo = json.dumps(dati, ensure_ascii=False).encode("utf-8")
@@ -293,6 +346,13 @@ def _richiesta_ponte(metodo, percorso, corpo):
         if percorso == "/ponte/farmaci/azione" and metodo == "POST":
             dati = json.loads(corpo.decode("utf-8") or "{}")
             return _rispondi(200, {"ok": True, "esito": farmaci_azione(str(dati.get("azione") or ""))})
+        if percorso.startswith("/ponte/esportazione/") and metodo == "GET":
+            voce = _ESPORTAZIONI.pop(percorso.rsplit("/", 1)[-1], None)
+            if not voce:
+                return _rispondi(404, {"ok": False, "error": "file da scaricare non piu' disponibile"})
+            nome, dati = voce
+            # il nome del file lo mette la pagina (puo' contenere lettere accentate)
+            return 200, [("Content-Type", "application/zip")], dati
         return _rispondi(404, {"ok": False, "error": "percorso del ponte sconosciuto"})
     except Exception as exc:
         return _rispondi(500, {"ok": False, "error": str(exc)})

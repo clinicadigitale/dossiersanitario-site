@@ -112,7 +112,7 @@ async function avvia(base){
   py.runPython("import sys\nsys.path.insert(0,'/ponte')\nsys.path.insert(0,'/ponte/pdfium_web')\nimport ponte_web\nponte_web.prepara_ambiente('/dati','/motore')\nponte_web.motore()\nponte_web.adatta_cifratura()");
   ponte=py.globals.get('ponte_web')||py.pyimport('ponte_web');
   ponte.imposta_chiave(py.toPy(Array.from(dek)));dek.fill(0);
-  py.runPython("ponte_web.adatta_google('"+base+"oauth-google.html')\nponte_web.adatta_avvisi('/dati')");
+  py.runPython("ponte_web.adatta_google('"+base+"oauth-google.html')\nponte_web.adatta_avvisi('/dati')\nponte_web.adatta_esportazioni()");
   stato('Motore del Dossier pronto',true);
 }
 async function esegui(m){

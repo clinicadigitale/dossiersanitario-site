@@ -18,7 +18,7 @@ const DossierDoctorExport=(()=>{
     const active=document.querySelector('#profileSelect')?.value||profiles[0].id;
     const el=overlay(`<section style="width:min(720px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.28);padding:28px;color:#1f2937">
       <div style="display:flex;align-items:center;gap:14px"><img src="assets/icon-128.png" alt="" style="width:58px;height:58px"><div><div style="font-size:12px;font-weight:800;letter-spacing:.08em;color:#0f766e">VERSIONE PER MEDICO</div><h2 style="margin:4px 0 0">Crea dossier in sola lettura</h2></div></div>
-      <p style="line-height:1.55">Scegli direttamente dove creare la copia, anche su una chiavetta USB. Verrà creata automaticamente una normale cartella <strong>Dossier sanitario per medico - data</strong>, senza ZIP e senza file EXE. Il medico apre <strong>APRI_DOSSIER.html</strong>.</p>
+      <p style="line-height:1.55">La copia viene scaricata come file ZIP nella cartella Download del browser. Copiala su una chiavetta USB o consegnala al medico: una volta estratta, il medico apre <strong>APRI_DOSSIER.html</strong>, senza installare nulla.</p>
       <div style="display:grid;gap:12px;margin-top:18px">
         <label style="display:flex;gap:10px;align-items:flex-start;padding:14px;border:1px solid #d8e2e0;border-radius:12px"><input type="radio" name="doctorMode" value="single" checked style="margin-top:4px"><span><strong>Profilo singolo</strong><br><small>Esporta soltanto il profilo attualmente selezionato.</small></span></label>
         <label style="display:flex;gap:10px;align-items:flex-start;padding:14px;border:1px solid #d8e2e0;border-radius:12px"><input type="radio" name="doctorMode" value="family" style="margin-top:4px"><span><strong>Famiglia</strong><br><small>Esporta i profili selezionati nello stesso dossier. Il medico cambia persona dal menu in alto a sinistra.</small></span></label>
@@ -39,12 +39,11 @@ const DossierDoctorExport=(()=>{
       const button=el.querySelector('#doctorCreateBtn');button.disabled=true;el.querySelector('#doctorCancelBtn').disabled=true;el.querySelector('#doctorExportProgress').style.display='block';
       try{
         el.querySelector('#doctorExportPhase').textContent='Scelta destinazione';
-        el.querySelector('#doctorExportDetail').textContent='Seleziona Desktop, una chiavetta USB o un’altra cartella nella finestra di Windows.';
+        el.querySelector('#doctorExportDetail').textContent='Preparazione del file ZIP da scaricare.';
         const target=await DossierSecurity.request('/api/doctor-export/select-folder',{method:'POST',body:{}});
         if(target.cancelled){button.disabled=false;el.querySelector('#doctorCancelBtn').disabled=false;el.querySelector('#doctorExportProgress').style.display='none';return;}
         const result=await build(ids,{includeOriginals,mode,exportSession:target,progress:(pct,phase,detail)=>{el.querySelector('#doctorExportPct').textContent=`${Math.round(pct)}%`;el.querySelector('#doctorExportBar').style.width=`${Math.max(0,Math.min(100,pct))}%`;el.querySelector('#doctorExportPhase').textContent=phase;el.querySelector('#doctorExportDetail').textContent=detail||'';}});
-        close();alert(`Versione per medico creata correttamente in:
-${result}`);
+        close();alert(`Versione per medico creata. Il file ${result} è stato scaricato nella cartella Download del browser: puoi copiarlo su una chiavetta o inviarlo.`);
       }catch(error){console.error(error);alert(`Versione per medico non creata: ${error.message}`);button.disabled=false;el.querySelector('#doctorCancelBtn').disabled=false;}
     };
   }

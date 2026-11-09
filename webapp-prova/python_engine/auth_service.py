@@ -187,7 +187,7 @@ def _dpapi_unprotect(value: str) -> bytes:
     if not value.startswith("dpapi:"):
         raise AuthError("Segreto di autenticazione non valido", "invalid_secret", 500)
     if os.name != "nt":
-        raise AuthError("Il segreto DPAPI può essere aperto soltanto su Windows", "dpapi_unavailable", 500)
+        raise AuthError("Questo codice di accesso era protetto dal computer Windows su cui è stato creato e non si può aprire nel browser: riattiva la verifica in due passaggi", "dpapi_unavailable", 500)
 
     import ctypes
     from ctypes import wintypes

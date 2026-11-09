@@ -10,17 +10,27 @@
   let worker=null,seq=0;const attese=new Map();let pronto=false;
   function avvia(){
     if(worker)return worker;
-    worker=new Worker(base+'engine-worker.js?v=web9');
+    worker=new Worker(base+'engine-worker.js?v=web10');
     worker.onmessage=e=>{const m=e.data||{};
       if(m.tipo==='stato'){mostraStato(m.testo,m.fine,m.errore);if(m.fine)pronto=true;return;}
       const a=attese.get(m.id);if(!a)return;attese.delete(m.id);
       if(m.errore){a.reject(new TypeError('Motore del Dossier: '+m.errore));return;}
       if(a.percorso==='/api/calendar/google/oauth/start'&&m.status===200)apriGoogle(m.corpo);
       if(a.percorso==='/api/calendar/local/status'&&m.status===200)m.corpo=statoAvvisi(m.corpo);
+      if(a.percorso==='/api/doctor-export/complete'&&m.status===200)scaricaEsportazione(m.corpo);
       a.resolve(new Response(m.status===204||m.status===304?null:m.corpo,{status:m.status,headers:m.intestazioni}));};
     worker.onerror=e=>{mostraStato('Il motore del Dossier non si è avviato: '+(e.message||'errore'),true,true);};
     worker.postMessage({tipo:'avvia',base:new URL('..',base).href});
     return worker;
+  }
+  // Esportazioni: il motore consegna un file ZIP che il browser scarica nella cartella Download
+  async function scaricaEsportazione(corpo){
+    let d={};try{d=JSON.parse(new TextDecoder().decode(corpo));}catch(_e){return;}
+    if(!d.download)return;
+    try{const r=await window.fetch('http://127.0.0.1:'+PORTA+d.download);if(!r.ok)throw new Error('file non disponibile');
+      const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=d.downloadName||'Dossier.zip';
+      document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+    }catch(err){mostraStato('Il file da scaricare non è stato creato: '+(err&&err.message||err),true,true);}
   }
   async function chiedi(req){
     avvia();

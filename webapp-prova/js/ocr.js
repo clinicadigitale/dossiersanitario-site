@@ -9,7 +9,7 @@ const OCRService = (() => {
     for(let i=0;i<attempts;i++){
       try{return await fetch(url,options);}catch(error){lastError=error;if(error?.name==='AbortError')throw error;if(i<attempts-1)await sleep(500*(i+1));}
     }
-    throw lastError||new Error('Connessione al motore locale non disponibile');
+    throw lastError||new Error('Motore del Dossier non disponibile');
   }
 
   async function health(force=false) {
@@ -46,7 +46,7 @@ const OCRService = (() => {
   }
 
   async function analyzeFile(file,onProgress=()=>{}) {
-    onProgress({stage:'upload',progress:1,processedPages:0,totalPages:0,message:'Invio del documento al motore locale'});
+    onProgress({stage:'upload',progress:1,processedPages:0,totalPages:0,message:'Invio del documento al motore del Dossier'});
     const controller=new AbortController();
     const timeout=setTimeout(()=>controller.abort(),45*60*1000);
     try {

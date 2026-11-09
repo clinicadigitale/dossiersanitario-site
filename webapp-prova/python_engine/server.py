@@ -991,7 +991,7 @@ def _doctor_export_cleanup():
 
 def _doctor_select_parent_folder() -> str:
     if os.name != "nt":
-        raise RuntimeError("La scelta della cartella e disponibile nella versione Windows del Dossier")
+        raise RuntimeError("La scelta della cartella non e disponibile nel browser")
     helper = ROOT / "DossierFolderPicker.exe"
     if not helper.is_file():
         raise RuntimeError("Selettore cartella Windows mancante. Reinstalla questa versione del Dossier.")
@@ -1030,7 +1030,7 @@ def _doctor_unique_folder(parent: Path) -> Path:
 def _visit_external_destination(parent: Path) -> tuple[bool, str]:
     """Allow removable media and non-system fixed drives only."""
     if os.name != "nt":
-        return False, "L'esportazione per struttura sanitaria richiede una memoria esterna su Windows"
+        return False, "Esportazione per struttura sanitaria non disponibile"
     try:
         resolved = parent.resolve()
         drive = str(resolved.drive or "").upper()
@@ -2045,7 +2045,7 @@ def _calendar_ps_quote(value: str) -> str:
 
 def _calendar_run_powershell(script: str, timeout: int = 30):
     if os.name != "nt":
-        raise RuntimeError("Programmazione avvisi Windows disponibile solo su Windows")
+        raise RuntimeError("Programmazione degli avvisi non disponibile in questo browser")
     proc = subprocess.run(
         ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
@@ -2142,7 +2142,7 @@ def _calendar_schedule_event(event: dict, profile_name: str = "") -> dict:
     if not reminders:
         return {"scheduledCount": 0, "skippedCount": 0}
     if os.name != "nt":
-        raise RuntimeError("Gli avvisi automatici sono disponibili nell'installazione Windows")
+        raise RuntimeError("Gli avvisi automatici non sono disponibili in questo browser")
     if not REMINDER_EXE.exists():
         raise RuntimeError("Componente locale promemoria non disponibile")
     start = _calendar_event_start(event)
@@ -4039,7 +4039,7 @@ class ApiHandler(CommonHeadersMixin, BaseHTTPRequestHandler):
         try:
             cfg = _load_update_config()
             if cfg.get("storeManaged"):
-                self.send_json(409, {"ok": False, "error": "Gli aggiornamenti Windows sono gestiti da Microsoft Store"}); return
+                self.send_json(409, {"ok": False, "error": "La versione nel browser si aggiorna da sola"}); return
             with UPDATE_STATE_LOCK:
                 manifest = dict(LAST_UPDATE_MANIFEST or {})
             if cfg.get("testMode"):
@@ -4058,7 +4058,7 @@ class ApiHandler(CommonHeadersMixin, BaseHTTPRequestHandler):
         try:
             cfg = _load_update_config()
             if cfg.get("storeManaged"):
-                self.send_json(409, {"ok": False, "error": "Gli aggiornamenti Windows sono gestiti da Microsoft Store"}); return
+                self.send_json(409, {"ok": False, "error": "La versione nel browser si aggiorna da sola"}); return
             if cfg.get("testMode"):
                 UPDATE_DIR.mkdir(parents=True, exist_ok=True)
                 _write_json_atomic(UPDATE_TEST_MARKER, {"appliedAt": time.strftime("%Y-%m-%dT%H:%M:%S"), "version": (cfg.get("testManifest") or {}).get("version")})
@@ -5391,7 +5391,7 @@ def cloud_status():
     return result
 
 def install_rclone():
-    if os.name != "nt": raise RuntimeError("Il connettore cloud integrato può essere installato soltanto su Windows")
+    if os.name != "nt": raise RuntimeError("Nel browser il cloud si collega senza installare il connettore")
     CLOUD_DIR.mkdir(parents=True, exist_ok=True)
     if RCLONE_EXE.exists(): return {"installed": True, "version": run_rclone(["version"], timeout=20)["stdout"].splitlines()[0]}
     # La distribuzione Microsoft Store può includere rclone nel pacchetto. In quel
