@@ -75,7 +75,7 @@ const DossierCloud = (() => {
     const read=raw.match(/Can't read the data of ['"]([^'"]+)['"]/i);
     if(read)return `Non è stato possibile leggere il file “${read[1]}”. Il file verrà mantenuto nell’archivio locale e la sincronizzazione potrà essere riprovata.`;
     if(/supported JavaScript type|Blob, ArrayBuffer/i.test(raw))return 'Non è stato possibile preparare uno dei file locali per la sincronizzazione. Riprova; se il problema continua usa “Segnala problema”.';
-    if(error?.code==='local_service_unavailable'||/motore locale|servizio locale|8896|connessione al motore locale/i.test(raw))return 'Il servizio locale del Dossier non risponde. Chiudi il Dossier, riaprilo dall’icona sul Desktop e riprova.';
+    if(error?.code==='local_service_unavailable'||/motore locale|servizio locale|8896|connessione al motore locale/i.test(raw))return 'Il motore del Dossier non risponde. Ricarica la pagina (tasto F5) e riprova.';
     if(/network|failed to fetch|timed? out|timeout/i.test(raw))return 'Connessione al servizio cloud non completata. Verifica la rete e riprova.';
     if(/(?:codice|code)\s*[34]\b/i.test(raw))return 'Il percorso cloud richiesto non è ancora presente. Il Dossier riproverà senza considerarlo un errore di sincronizzazione.';
     if(/Source doesn't exist or is a directory and destination is a file/i.test(raw))return 'Un file dell’archivio cloud non è stato letto correttamente. Le modifiche locali restano in attesa e la sincronizzazione può essere riprovata.';
@@ -118,7 +118,7 @@ const DossierCloud = (() => {
 
   async function request(path,options={}) {
     let response;
-    try{response=await fetch(`${API}${path}`,options);}catch(cause){const error=new Error('Il motore locale del Dossier non risponde. Chiudi il Dossier, riaprilo dall’icona sul Desktop e riprova.');error.code='local_service_unavailable';error.cause=cause;throw error;}
+    try{response=await fetch(`${API}${path}`,options);}catch(cause){const error=new Error('Il motore del Dossier non risponde. Ricarica la pagina (tasto F5) e riprova.');error.code='local_service_unavailable';error.cause=cause;throw error;}
     if(!response.ok){let message=`Errore cloud ${response.status}`,code='cloud_request_failed';try{const j=await response.json();message=j.error||message;code=j.code||code;}catch{}const error=new Error(message);error.code=code;error.status=response.status;throw error;}
     const type=response.headers.get('content-type')||'';
     return type.includes('application/json')?response.json():response.blob();
@@ -194,7 +194,7 @@ const DossierCloud = (() => {
       if(attempt+1<Math.max(1,retries))await new Promise(r=>setTimeout(r,delay));
     }
     if(lastError?.code==='local_service_unavailable')throw lastError;
-    const localError=new Error('Il motore locale del Dossier non risponde. Chiudi il Dossier, riaprilo dall’icona sul Desktop e riprova.');
+    const localError=new Error('Il motore del Dossier non risponde. Ricarica la pagina (tasto F5) e riprova.');
     localError.code='local_service_unavailable';localError.cause=lastError;throw localError;
   }
 

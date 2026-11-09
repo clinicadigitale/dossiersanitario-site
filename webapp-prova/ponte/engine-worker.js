@@ -101,7 +101,8 @@ async function avvia(base){
   py.FS.mount(py.FS.filesystems.IDBFS,{},'/dati');
   await syncfs(true);
   py.FS.mkdirTree('/motore/vendor/qrcode/image/styles/moduledrawers');py.FS.mkdirTree('/motore/vendor/qrcode/compat');py.FS.mkdirTree('/ponte/pdfium_web/pypdfium2');
-  const scarica=async(url)=>{const r=await fetch(url,{cache:'no-cache'});if(!r.ok)throw new Error('file mancante: '+url);return await r.text();};
+  // durante la pubblicazione di un aggiornamento il sito puo' rispondere per pochi secondi con errori: si riprova
+  const scarica=async(url)=>{for(let t=0;;t++){try{const r=await fetch(url,{cache:'no-cache'});if(r.ok)return await r.text();if(t>=3)throw new Error('file mancante: '+url);}catch(e){if(t>=3)throw e;}await new Promise(ok=>setTimeout(ok,1500*(t+1)));}};
   await Promise.all(FILE_MOTORE.map(async f=>{py.FS.writeFile('/motore/'+f,await scarica(base+'python_engine/'+nomeWeb(f)));}));
   py.FS.writeFile('/ponte/ponte_web.py',await scarica(base+'ponte/ponte_web.py'));
   py.FS.writeFile('/ponte/pdfium_web/pypdfium2/__init__.py',await scarica(base+'ponte/pdfium_web/pypdfium2/'+nomeWeb('__init__.py')));

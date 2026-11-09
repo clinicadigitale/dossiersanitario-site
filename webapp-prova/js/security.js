@@ -74,7 +74,7 @@ const DossierSecurity = (() => {
     try{
       response=await fetch(`${API_ORIGIN}${path}`,{method,headers,body:body===null?undefined:JSON.stringify(body),cache:'no-store'});
     }catch(error){
-      const localError=new Error('Il servizio locale di autenticazione non risponde. Chiudi il Dossier, riaprilo dall’icona sul Desktop e riprova.');
+      const localError=new Error('Il sistema di accesso del Dossier non risponde. Ricarica la pagina (tasto F5) e riprova.');
       localError.code='local_service_unavailable';
       localError.cause=error;
       throw localError;
@@ -89,7 +89,7 @@ const DossierSecurity = (() => {
     const headers={'Accept':'application/json','Content-Type':contentType||blob?.type||'application/octet-stream'};
     if(auth&&session?.token)headers['X-Dossier-Session']=session.token;
     let response;
-    try{response=await fetch(`${API_ORIGIN}${path}`,{method:'POST',headers,body:blob,cache:'no-store'});}catch(error){const localError=new Error('Il servizio locale non risponde. Riavvia Clinica Digitale e riprova.');localError.code='local_service_unavailable';localError.cause=error;throw localError;}
+    try{response=await fetch(`${API_ORIGIN}${path}`,{method:'POST',headers,body:blob,cache:'no-store'});}catch(error){const localError=new Error('Il motore del Dossier non risponde. Ricarica la pagina (tasto F5) e riprova.');localError.code='local_service_unavailable';localError.cause=error;throw localError;}
     let data={};try{data=await response.json();}catch{}
     if(!response.ok||data.ok===false){const error=new Error(data.error||`Operazione non riuscita (${response.status})`);error.code=data.code||'request_failed';error.status=response.status;throw error;}
     return data;
@@ -98,7 +98,7 @@ const DossierSecurity = (() => {
   async function fetchBlob(path,{auth=true}={}) {
     const headers={'Accept':'application/octet-stream'};if(auth&&session?.token)headers['X-Dossier-Session']=session.token;
     let response;
-    try{response=await fetch(`${API_ORIGIN}${path}`,{method:'GET',headers,cache:'no-store'});}catch(error){const localError=new Error('Il servizio locale non risponde. Riavvia Clinica Digitale e riprova.');localError.code='local_service_unavailable';localError.cause=error;throw localError;}
+    try{response=await fetch(`${API_ORIGIN}${path}`,{method:'GET',headers,cache:'no-store'});}catch(error){const localError=new Error('Il motore del Dossier non risponde. Ricarica la pagina (tasto F5) e riprova.');localError.code='local_service_unavailable';localError.cause=error;throw localError;}
     if(!response.ok){let data={};try{data=await response.json();}catch{}const error=new Error(data.error||`Operazione non riuscita (${response.status})`);error.code=data.code||'request_failed';error.status=response.status;throw error;}
     return response.blob();
   }
@@ -181,7 +181,7 @@ const DossierSecurity = (() => {
       const proceed=()=>{if(!status.initialized)showInitialSetup();else showLogin(status.users||[]);};
       if(firstUse?.accepted)proceed();else showFirstUseReadme(async()=>{await api('/api/system/first-use/accept',{method:'POST',auth:false,body:{accepted:true}});proceed();});
     }
-    catch(error){showOverlay(`<div class="security-brand"><img src="assets/icon-192.png" alt=""><div><span>ERRORE DI AVVIO</span><h1>Dossier Sanitario Locale</h1></div></div><div class="notice danger">Il sistema di accesso locale non è disponibile.</div><p>${esc(error.message)}</p><button type="button" id="retrySecurityBootstrap" class="btn btn-primary btn-full">Riprova</button>`);document.querySelector('#retrySecurityBootstrap').onclick=()=>bootstrap(callback);}
+    catch(error){showOverlay(`<div class="security-brand"><img src="assets/icon-192.png" alt=""><div><span>ERRORE DI AVVIO</span><h1>Dossier Sanitario Locale</h1></div></div><div class="notice danger">Il sistema di accesso del Dossier non è disponibile.</div><p>${esc(error.message)}</p><button type="button" id="retrySecurityBootstrap" class="btn btn-primary btn-full">Riprova</button>`);document.querySelector('#retrySecurityBootstrap').onclick=()=>bootstrap(callback);}
   }
 
   async function bootstrapRestoreFromFile(file,statusLabel='Verifica backup in corso…'){
