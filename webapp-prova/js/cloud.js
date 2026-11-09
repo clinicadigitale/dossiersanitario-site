@@ -383,7 +383,7 @@ const DossierCloud = (() => {
       recoveryUi.update(56,'Verifica e decifratura','Controllo integrità e apertura della copia cifrata.');
       const decoded=await decryptBlob(encrypted,raw);decoded.blob.name='dossier_cloud_restore.zip';
       recoveryUi.update(60,'Ripristino copia completa','Ricostruzione dell’archivio locale.');
-      const restored=await App.restoreZip(decoded.blob,{skipConfirm:true,importUsers:true,replaceAll:true,skipRefresh:true});if(!restored)throw new Error('La copia cloud non è stata ripristinata');
+      const restored=await App.restoreZip(decoded.blob,{skipConfirm:true,importUsers:true,replaceAll:true,skipRefresh:true});if(!restored){const motivo=App.lastRestoreMessage?.()||'';throw new Error('La copia cloud non è stata ripristinata'+(motivo?'. '+motivo:''));}
       // Qualsiasi coda precedente allo stato ripristinato viene azzerata mentre il cloud è ancora disattivato.
       await DossierDB.clear('syncQueue');
       const progress=(pct,phase,detail)=>{const rawPct=Math.max(0,Math.min(100,Number(pct)||0));const overall=68+rawPct*.26;updateStatusText(`${phase}${detail?` · ${detail}`:''}`);setCloudProgress(overall,phase,detail);recoveryUi.update(overall,phase,detail);};
@@ -780,7 +780,7 @@ Conservare separatamente dal computer e dal cloud. Chi possiede questa chiave pu
   }
   function bindArchiveForms(root=document){
     root.querySelector('#createCloudArchiveForm')?.addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget;setBusy(form,true,'Creazione e cifratura…');try{await createArchive(form);}catch(err){App.toast(err.message);}finally{setBusy(form,false);}});
-    root.querySelector('#linkCloudArchiveForm')?.addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget;setBusy(form,true,'Download e ripristino…');try{await linkArchive(form);}catch(err){App.toast(err.message);}finally{setBusy(form,false);}});
+    root.querySelector('#linkCloudArchiveForm')?.addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget;setBusy(form,true,'Download e ripristino…');try{await linkArchive(form);}catch(err){console.error('Collegamento archivio non riuscito:',err);App.toast(err.message);alert('Collegamento non completato.\n\n'+String(err?.message||err));}finally{setBusy(form,false);}});
   }
   async function bind(root=document){
     root.querySelector('#cloudInstallConnector')?.addEventListener('click',e=>installConnector(e.currentTarget).catch(err=>App.toast(err.message)));
