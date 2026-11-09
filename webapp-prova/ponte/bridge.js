@@ -248,7 +248,9 @@
     caratteriFatto=p.then(n=>{if(!n)caratteriFatto=null;return n;});
     return caratteriFatto;
   }
-  const isPdf=req=>{try{const u=new URL(req.url);if(!/^\/api\/ocr(\/start)?$/.test(u.pathname))return false;return /\.pdf$/i.test(decodeURIComponent(req.headers.get('X-File-Name')||''));}catch(_e){return false;}};
+  const isPdf=req=>{try{const u=new URL(req.url);if(!/^\/api\/ocr(\/start)?$/.test(u.pathname))return false;const nome=decodeURIComponent(req.headers.get('X-File-Name')||'');
+    // i PDF creati dalle foto contengono solo immagini: i caratteri non servono
+    return /\.pdf$/i.test(nome)&&!/^referto_(fotocamera|scanner)_/i.test(nome);}catch(_e){return false;}};
 
   let box=null;
   function mostraStato(testo,fine,errore){

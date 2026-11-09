@@ -6448,3 +6448,6 @@ html,body{background:#eef4f9;color:#173956}
 }
 
 .graph-choice:has(input:checked) strong{color:#102f49!important}.graph-choice:has(input:checked) small{color:#294a63!important}
+
+/* webapp: lo scanner non si comanda dal browser, il tasto spiega come fare */
+#scannerBtn,#calendarBookingScannerBtn,[data-action^="scanner-card-"]{opacity:.55}

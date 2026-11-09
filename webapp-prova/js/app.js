@@ -3699,53 +3699,91 @@ const App = (() => {
     if(!response.ok||result.ok===false)throw new Error(result.error||`Creazione PDF non riuscita (${response.status})`);
     return result;
   }
-  async function visitPrintableHtmlV10(draft,selected,meds,p){
+  // Cartella dedicata con lo stesso nome dell'exe: "Clinica Digitale - <visita> - gg-mm-aaaa", poi (2), (3)...
+  async function visitWebFolderV11(parent,specialty,visitDate){
+    let label=String(specialty||'Visita').replace(/[^A-Za-z0-9À-ÿ ._-]+/g,' ').trim().replace(/\s+/g,' ').slice(0,70)||'Visita';
+    const m=String(visitDate||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);const d=new Date();
+    const dateLabel=m?`${m[3]}-${m[2]}-${m[1]}`:`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+    const base=`Clinica Digitale - ${label} - ${dateLabel}`;
+    for(let n=1;n<100;n++){const name=n===1?base:`${base} (${n})`;
+      try{await parent.getDirectoryHandle(name);continue;}catch(error){if(error?.name!=='NotFoundError'&&error?.name!=='TypeMismatchError')throw error;if(error?.name==='TypeMismatchError')continue;}
+      return parent.getDirectoryHandle(name,{create:true});}
+    throw new Error('Impossibile creare una cartella univoca per la visita');
+  }
+  async function visitWebWriteV11(root,path,blob){
+    const parts=String(path).split('/').filter(Boolean);let dir=root;
+    for(const part of parts.slice(0,-1))dir=await dir.getDirectoryHandle(part,{create:true});
+    const handle=await dir.getFileHandle(parts[parts.length-1],{create:true});const w=await handle.createWritable();
+    try{await w.write(blob||new Blob([]));await w.close();}catch(error){try{await w.abort();}catch{}throw error;}
+  }
+  async function visitPrintableHtmlV10(draft,selected,meds,p,links=null){
     const condition=state.diagnoses.find(x=>String(x.id)===String(draft.conditionId||''));
     const docs=globalThis.HealthExtractors?.prepareDocuments24?HealthExtractors.prepareDocuments24(selected,p):selected;
     const root=$('#printRoot'),spaceSaving=draft.pdfLayout!=='one-per-page';
     root.className='print-root visit-print-root';root.classList.toggle('print-space-saving',spaceSaving);root.dataset.spaceSaving=spaceSaving?'true':'false';
     const req=(draft.requests||[]).map(r=>`<li><strong>${esc(r.type||'Richiesta')}:</strong> ${esc(r.text||'')}</li>`).join('');
     const medsHtml=meds.map(m=>`<tr><td><strong>${esc(m.profileName||calendarProfileName(m.profileId))}</strong></td><td><strong>${esc(m.medication)}</strong></td><td>${formatDate(m.reorderDate)}</td><td>${formatDate(m.depletionDate)}</td></tr>`).join('');
-    const indexRows=docs.map((d,i)=>`<tr><td>${i+1}</td><td>${formatDate(d.clinicalDate)}</td><td><strong>${esc(d.title||d.originalName||'Documento')}</strong><br>${esc([d.documentKind||d.category,d.specialization||d.department,d.doctor,d.facility].filter(Boolean).join(' · '))}</td></tr>`).join('');
+    const indexRows=docs.map((d,i)=>`<tr><td>${i+1}</td><td>${formatDate(d.clinicalDate)}</td><td><strong>${esc(d.title||d.originalName||'Documento')}</strong>${links&&links.get(String(d.id))?` · <a class="visit-web-link" href="${esc(links.get(String(d.id)).split('/').map(encodeURIComponent).join('/'))}" target="_blank">Apri originale</a>`:''}<br>${esc([d.documentKind||d.category,d.specialization||d.department,d.doctor,d.facility].filter(Boolean).join(' · '))}</td></tr>`).join('');
     root.innerHTML=`<section class="print-page print-cover visit-print-cover modern-pdf-cover modern-pdf-cover-visit"><div class="modern-cover-topline"><p class="modern-cover-kicker">Sintesi per consulto</p><p class="modern-cover-motto">Ascolto<br>prevenzione<br>percorso</p></div><div class="modern-cover-title"><h1>Prepara la visita</h1><p class="modern-cover-subtitle">Le informazioni essenziali per il tuo consulto.</p></div><div class="modern-cover-patient"><p class="modern-cover-label">Paziente</p><h2>${esc(p.firstName)} ${esc(p.lastName)}</h2><dl class="modern-cover-meta"><dt>Data di nascita</dt><dd>${formatDate(p.birthDate)}</dd><dt>Data prevista</dt><dd>${draft.visitDate?formatDate(draft.visitDate):'Non definita'}</dd><dt>Tipo visita</dt><dd>${esc(draft.specialtyLabel||'Visita')}</dd></dl></div><div class="modern-cover-summary">${condition?`<div class="modern-cover-visit-box"><small>Motivo / condizione</small><strong>${esc(condition.name)}</strong></div>`:''}<div><strong>${docs.length}</strong><span>documenti allegati</span></div><div><strong>${meds.length}</strong><span>farmaci da valutare</span></div><div><strong>${(draft.requests||[]).length}</strong><span>cose da chiedere</span></div></div><div class="modern-cover-product"><div><strong>Clinica Digitale - Dossier Sanitario</strong><span>Per maggiori informazioni e per scaricare gratuitamente il programma: <b>www.dossiersanitario.it</b></span></div><img class="modern-cover-qr" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASgAAAEoAQAAAADDfFG0AAABfElEQVR42u2Zy27EMAwDOUX//5fZgyTn5d3tsQWYQxAYPA1omlawfvF8Kaqooorqr6m+JYn6tjAWFpKP1fC68ZKLGkLCksyxGl5PFTQgYyGfV8PrpcpCyJTJkl8fVOC2lgmvN/l1pmQ0Mebw2vNqN2GMZUxTC6/bg3dr+LoeXhcVq0sIakeash3h9VS5XYWwaUYg08EfXld/oaN2tbv6O/7a+qtoYQvmKlRrDq+nvyy3v7DVLQytQzK8rioAu5N/TgCtO2R4XfuXp1pgsZrEHJHhtekTrELf0xx3BUt+7fajzXlGoWNrJr9252OdhKacVsHf7/DanY/HdbFjyxKyk1+7+yOVU7g+q37R8+nwuvMqMjPZYb3XQCe8tvMJpqfOy+R/x6Z/jbXM/B66uS68Lrx0DrHKfp9u3+F159WskKu1TrO3kvdbXivrPaHWt8n0rzcq1HWV7vc4/X7rr/V/aDoXq4GF15MXy18zyddsR9InXvavJFNUUUX1j1Q/kVmgg2GquzYAAAAASUVORK5CYII=" alt="QR www.dossiersanitario.it"></div><p class="modern-cover-footer">Questo fascicolo per la visita è stato creato con Clinica Digitale - Dossier Sanitario. Da utilizzare come supporto per la visita medica.</p></section><section class="print-page print-section visit-print-summary"><h2>Promemoria per la visita</h2>${req?`<h3>Cose da chiedere</h3><ul class="visit-print-list">${req}</ul>`:'<p>Nessuna richiesta specifica inserita.</p>'}${meds.length?`<h3>Farmaci da richiedere</h3><table class="print-table"><thead><tr><th>Persona</th><th>Farmaco</th><th>Richiesta prevista</th><th>Scorta stimata fino al</th></tr></thead><tbody>${medsHtml}</tbody></table>`:''}<h3>Documenti inclusi</h3>${docs.length?`<table class="print-table"><thead><tr><th>#</th><th>Data</th><th>Documento</th></tr></thead><tbody>${indexRows}</tbody></table>`:'<p>Nessun documento selezionato.</p>'}</section>${docs.map(d=>HealthReport.documentHtml(d,{formatDate,formatDateTime,profile:p,documents:docs})).join('')}`;
     try{await waitForPrintAssets(root);await HealthReport.preparePrintLayout?.(root,{spaceSaving});}catch(error){console.warn('Impaginazione fascicolo visita per memoria esterna:',error);}
     let css='';try{const response=await fetch('css/app.css',{cache:'no-store'});if(response.ok)css=await response.text();}catch{}
     const body=root.outerHTML;
     root.innerHTML='';root.className='';delete root.dataset.spaceSaving;
-    return `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Preparazione visita</title><style>${css}\nbody{background:#fff!important;margin:0!important}#printRoot{display:block!important}.print-root{display:block!important}@page{size:A4;margin:12mm}</style></head><body>${body}</body></html>`;
+    return `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Preparazione visita</title><style>${css.replace(/@media\s+print/g,'@media all')}\nbody{background:#fff!important;margin:0!important}#printRoot{display:block!important}.print-root{display:block!important}@page{size:A4;margin:12mm}body>#visitWebBar.visit-web-bar{display:flex!important}.visit-web-bar{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#0f766e;color:#fff;padding:10px 16px;font:600 14px Segoe UI,system-ui,sans-serif}.visit-web-bar button{font:600 14px Segoe UI,system-ui,sans-serif;border:0;border-radius:10px;padding:9px 16px;background:#fff;color:#0f766e;cursor:pointer}.visit-web-link{color:#0f766e;font-weight:600}@media print{body>#visitWebBar.visit-web-bar{display:none!important}.visit-web-link{color:inherit;text-decoration:none}}</style></head><body><div id="visitWebBar" class="visit-web-bar"><span>Fascicolo della visita · Clinica Digitale - Dossier Sanitario</span><button type="button" onclick="window.print()">Stampa o salva in PDF</button></div>${body}</body></html>`;
   }
   async function openVisitExternalExportV10(){
     const draft=visitLoadDraftV9(),collection=visitCollectionV9(draft),selected=visitSelectedDocumentsV9(draft,collection),meds=await visitFamilyMedicationCandidatesV26(draft),p=activeProfile();if(!p)return;
     const docIds=new Set(selected.map(d=>String(d.id))),studies=(await DossierDB.byProfile('dicomStudies',p.id)).filter(s=>docIds.has(String(s.linkedDocumentId||''))),linkedImages=(await DossierDB.byProfile('mediaAttachments',p.id)).filter(x=>docIds.has(String(x.linkedDocumentId||'')));
     const originals=selected.filter(d=>d.fileBlob),dicomFiles=studies.reduce((n,s)=>n+(s.files?.length||0),0),dicomBytes=studies.reduce((n,s)=>n+Number(s.totalBytes||0),0),imageBytes=linkedImages.reduce((n,x)=>n+Number(x.size||0),0);
-    openModal('Esporta per struttura sanitaria','La destinazione deve essere una memoria esterna: chiavetta USB, SSD o HDD esterno.',`<div class="form-grid"><div class="form-group full"><label class="check-row"><input type="radio" name="visitExternalMode" value="pdf" checked><span><strong>Solo PDF</strong><small>Esporta soltanto il fascicolo della visita in PDF.</small></span></label></div><div class="form-group full"><label class="check-row"><input type="radio" name="visitExternalMode" value="documents"><span><strong>PDF + referti e immagini associate</strong><small>${originals.length} referti originali · ${linkedImages.length} immagini associate${linkedImages.length?` · ${formatBytes(imageBytes)}`:''}.</small></span></label></div><div class="form-group full"><label class="check-row"><input type="radio" name="visitExternalMode" value="all" ${studies.length?'':'disabled'}><span><strong>PDF + referti + immagini + DICOM</strong><small>${studies.length?`${studies.length} studi DICOM · ${dicomFiles} file · ${formatBytes(dicomBytes)} · ${linkedImages.length} immagini associate`:'Nessuno studio DICOM collegato ai referti selezionati.'}</small></span></label></div><div class="form-group full"><div class="notice">La cartella viene creata direttamente sulla memoria esterna scelta. I file del Dossier originale non vengono modificati.</div></div><div class="form-group full hidden" id="visitExternalProgress"><div class="card-title-row"><strong id="visitExternalPhase">Preparazione</strong><span id="visitExternalPct">0%</span></div><div style="height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin:7px 0"><span id="visitExternalBar" style="display:block;height:100%;width:0%;background:#0f766e"></span></div><small id="visitExternalDetail"></small></div><div class="form-actions full"><button type="button" class="btn btn-light" id="visitExternalCancel">Annulla</button><button type="button" class="btn btn-primary" id="visitExternalStart">Scegli memoria esterna</button></div></div>`);
+    const usaCartella=typeof window.showDirectoryPicker==='function';
+    openModal('Esporta per struttura sanitaria',usaCartella?'Scegli dove salvare, per esempio una chiavetta USB o un disco esterno: dentro verrà creata una cartella dedicata.':'Il browser scaricherà un file ZIP con la cartella pronta da copiare sulla chiavetta USB o sul disco esterno.',`<div class="form-grid"><div class="form-group full"><label class="check-row"><input type="radio" name="visitExternalMode" value="pdf" checked><span><strong>Solo riepilogo</strong><small>Esporta soltanto il riepilogo della visita: si apre con qualsiasi browser e si può stampare o salvare in PDF.</small></span></label></div><div class="form-group full"><label class="check-row"><input type="radio" name="visitExternalMode" value="documents"><span><strong>Riepilogo + referti e immagini associate</strong><small>${originals.length} referti originali · ${linkedImages.length} immagini associate${linkedImages.length?` · ${formatBytes(imageBytes)}`:''}.</small></span></label></div><div class="form-group full"><label class="check-row"><input type="radio" name="visitExternalMode" value="all" ${studies.length?'':'disabled'}><span><strong>Riepilogo + referti + immagini + DICOM</strong><small>${studies.length?`${studies.length} studi DICOM · ${dicomFiles} file · ${formatBytes(dicomBytes)} · ${linkedImages.length} immagini associate`:'Nessuno studio DICOM collegato ai referti selezionati.'}</small></span></label></div><div class="form-group full"><div class="notice">${usaCartella?'La cartella viene creata nella posizione che scegli. I file del Dossier originale non vengono modificati.':'Estrai il file ZIP sulla chiavetta o dove preferisci. I file del Dossier originale non vengono modificati.'}</div></div><div class="form-group full hidden" id="visitExternalProgress"><div class="card-title-row"><strong id="visitExternalPhase">Preparazione</strong><span id="visitExternalPct">0%</span></div><div style="height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin:7px 0"><span id="visitExternalBar" style="display:block;height:100%;width:0%;background:#0f766e"></span></div><small id="visitExternalDetail"></small></div><div class="form-actions full"><button type="button" class="btn btn-light" id="visitExternalCancel">Annulla</button><button type="button" class="btn btn-primary" id="visitExternalStart">${usaCartella?'Scegli dove salvare':'Crea il file ZIP'}</button></div></div>`);
     $('#visitExternalCancel').onclick=closeModal;
     $('#visitExternalStart').onclick=async()=>{
       const mode=$('input[name="visitExternalMode"]:checked')?.value||'pdf',start=$('#visitExternalStart'),cancel=$('#visitExternalCancel'),progress=$('#visitExternalProgress'),phase=$('#visitExternalPhase'),pct=$('#visitExternalPct'),bar=$('#visitExternalBar'),detail=$('#visitExternalDetail');
       const update=(value,label,text='')=>{const v=Math.max(0,Math.min(100,Math.round(value)));progress.classList.remove('hidden');pct.textContent=`${v}%`;bar.style.width=`${v}%`;phase.textContent=label;detail.textContent=text;};
+      // come nell'exe, la copia dei file dell'esportazione passa dalle funzioni del piano MEDIUM
+      if(!globalThis.DossierFeatures?.has?.('doctorVersion')){alert('Questa funzione richiede il piano MEDIUM.');return;}
       start.disabled=true;cancel.disabled=true;
       try{
-        update(2,'Scelta destinazione','Seleziona una chiavetta USB, un SSD o un HDD esterno.');
-        const session=await DossierSecurity.request('/api/visit-export/select-folder',{method:'POST',body:{specialty:draft.specialtyLabel||'Visita',visitDate:draft.visitDate||today()}});
-        if(session.cancelled){start.disabled=false;cancel.disabled=false;progress.classList.add('hidden');return;}
-        update(8,'Preparazione PDF','Composizione del fascicolo della visita.');
-        const html=await visitPrintableHtmlV10(draft,selected,meds,p);await visitExternalPdfV10(session,html);update(25,'PDF creato','Riepilogo_visita.pdf');
-        let tasks=[];
+        // La cartella si sceglie subito, finche' il clic della persona e' ancora valido per il browser
+        let parent=null;
+        if(usaCartella){
+          update(2,'Scelta destinazione','Scegli la chiavetta, il disco o la cartella dove salvare.');
+          try{parent=await window.showDirectoryPicker({id:'dossier-visita',mode:'readwrite',startIn:'desktop'});}
+          catch(error){if(error?.name==='AbortError'){start.disabled=false;cancel.disabled=false;progress.classList.add('hidden');return;}throw error;}
+        }
+        let scrivi,cartella,session=null;
+        if(parent){
+          const sub=await visitWebFolderV11(parent,draft.specialtyLabel||'Visita',draft.visitDate||today());
+          cartella=parent.name?`${parent.name}/${sub.name}`:sub.name;
+          scrivi=(path,blob)=>visitWebWriteV11(sub,path,blob);
+        }else{
+          update(2,'Preparazione','Creazione della cartella da scaricare.');
+          session=await DossierSecurity.request('/api/visit-export/select-folder',{method:'POST',body:{specialty:draft.specialtyLabel||'Visita',visitDate:draft.visitDate||today()}});
+          if(session.cancelled){start.disabled=false;cancel.disabled=false;progress.classList.add('hidden');return;}
+          scrivi=(path,blob)=>visitExternalUploadV10(session,path,blob);
+        }
+        let tasks=[];const links=new Map();
         if(mode==='documents'||mode==='all'){
           const used=new Set();
-          for(const doc of originals){let name=visitExternalSafeNameV10(originalDocumentFileName(doc));const base=name;let n=2;while(used.has(name.toLowerCase())){const dot=base.lastIndexOf('.');name=dot>0?`${base.slice(0,dot)}_${n++}${base.slice(dot)}`:`${base}_${n++}`;}used.add(name.toLowerCase());tasks.push({kind:'doc',path:`Referti_originali/${name}`,blob:doc.fileBlob});}
+          for(const doc of originals){let name=visitExternalSafeNameV10(originalDocumentFileName(doc));const base=name;let n=2;while(used.has(name.toLowerCase())){const dot=base.lastIndexOf('.');name=dot>0?`${base.slice(0,dot)}_${n++}${base.slice(dot)}`:`${base}_${n++}`;}used.add(name.toLowerCase());tasks.push({kind:'doc',path:`Referti_originali/${name}`,blob:doc.fileBlob});links.set(String(doc.id),`Referti_originali/${name}`);}
           for(const image of linkedImages){const doc=selected.find(d=>String(d.id)===String(image.linkedDocumentId||''));const folder=visitExternalSafeNameV10(`${doc?.clinicalDate||'senza_data'}_${doc?.title||doc?.originalName||'Referto'}`);tasks.push({kind:'image',image,path:`Immagini_associate/${folder}/${visitExternalSafeNameV10(image.name||'immagine.jpg')}`});}
         }
         if(mode==='all'){
           for(const study of studies){const folder=visitExternalSafeNameV10(`${study.studyDate||'senza_data'}_${study.studyDescription||study.seriesDescription||study.studyUID||'Studio_DICOM'}`);for(const f of study.files||[])tasks.push({kind:'dicom',study,file:f,path:`DICOM/${folder}/${String(f.relativePath||f.name).replace(/\\/g,'/').split('/').map(visitExternalSafeNameV10).join('/')}`});}
         }
-        const readme=`CLINICA DIGITALE - ESPORTAZIONE PER STRUTTURA SANITARIA\r\n\r\nRiepilogo_visita.pdf: fascicolo preparato per la visita.\r\nReferti_originali: copie dei documenti originali selezionati.\r\nImmagini_associate: JPG/PNG collegati ai referti selezionati.\r\nDICOM: immagini diagnostiche originali collegate ai referti selezionati. Per visualizzare i file DICOM serve un visualizzatore DICOM disponibile nella struttura sanitaria.\r\n\r\nQuesta cartella contiene dati sanitari personali.\r\n`;
+        update(8,'Preparazione riepilogo','Composizione del fascicolo della visita.');
+        const html=await visitPrintableHtmlV10(draft,selected,meds,p,links);await scrivi('Riepilogo_visita.html',new Blob([html],{type:'text/html;charset=utf-8'}));update(25,'Riepilogo creato','Riepilogo_visita.html');
+        const readme=`CLINICA DIGITALE - ESPORTAZIONE PER STRUTTURA SANITARIA\r\n\r\nRiepilogo_visita.html: fascicolo preparato per la visita. Si apre con un doppio clic in qualsiasi browser, anche senza internet, e si può stampare o salvare in PDF.\r\nReferti_originali: copie dei documenti originali selezionati.\r\nImmagini_associate: JPG/PNG collegati ai referti selezionati.\r\nDICOM: immagini diagnostiche originali collegate ai referti selezionati. Per visualizzare i file DICOM serve un visualizzatore DICOM disponibile nella struttura sanitaria.\r\n\r\nQuesta cartella contiene dati sanitari personali.\r\n`;
         tasks.unshift({kind:'text',path:'LEGGIMI.txt',blob:new Blob([readme],{type:'text/plain;charset=utf-8'})});
         for(let i=0;i<tasks.length;i++){
           const task=tasks[i];let blob=task.blob;if(task.kind==='dicom'){if(!globalThis.ClinicaLot2?.getDicomFileBlob)throw new Error('Lettore DICOM non disponibile');blob=await ClinicaLot2.getDicomFileBlob(task.study,task.file);}else if(task.kind==='image'){if(!globalThis.ClinicaLot2?.getManagedMediaBlob)throw new Error('Archivio immagini locale non disponibile');blob=await ClinicaLot2.getManagedMediaBlob('image',task.image.profileId,task.image.id,task.image.storagePath||task.image.name);}
-          update(25+((i+1)/Math.max(1,tasks.length))*70,'Copia sulla memoria esterna',`${i+1}/${tasks.length} · ${task.path}`);await visitExternalUploadV10(session,task.path,blob);if(i%8===7)await new Promise(r=>setTimeout(r,0));
+          update(25+((i+1)/Math.max(1,tasks.length))*70,'Copia dei file',`${i+1}/${tasks.length} · ${task.path}`);await scrivi(task.path,blob);if(i%8===7)await new Promise(r=>setTimeout(r,0));
         }
-        await DossierSecurity.request('/api/doctor-export/complete',{method:'POST',body:{exportId:session.exportId}}).catch(()=>{});await DossierDB.addAudit('export','profiles',p.id,p.id,{event:'prepare-visit-external',mode,documentCount:originals.length,linkedImages:mode==='pdf'?0:linkedImages.length,dicomStudies:mode==='all'?studies.length:0}).catch(()=>{});update(100,'Completato',session.folderPath||session.folderName||'Cartella pronta');setTimeout(()=>{closeModal();alert(`Esportazione completata sulla memoria esterna:\n${session.folderPath||session.folderName||''}`);},250);
+        let fatto=cartella;
+        if(session){const r=await DossierSecurity.request('/api/doctor-export/complete',{method:'POST',body:{exportId:session.exportId}}).catch(()=>({}));fatto=r?.downloadName||r?.folderPath||session.folderName||'';}
+        await DossierDB.addAudit('export','profiles',p.id,p.id,{event:'prepare-visit-external',mode,documentCount:mode==='pdf'?0:originals.length,linkedImages:mode==='pdf'?0:linkedImages.length,dicomStudies:mode==='all'?studies.length:0}).catch(()=>{});update(100,'Completato',fatto||'Cartella pronta');
+        setTimeout(()=>{closeModal();alert(session?`Il file ${fatto} è stato scaricato nella cartella Download del browser.\nEstrailo sulla chiavetta USB o dove preferisci.`:`Esportazione completata nella cartella:\n${fatto}`);},250);
       }catch(error){console.error(error);alert(error?.message||'Esportazione non riuscita');start.disabled=false;cancel.disabled=false;}
     };
   }
@@ -4393,7 +4431,7 @@ const App = (() => {
 
           <p><strong>37. Esporta per struttura sanitaria.</strong> In <strong>Prepara visita</strong> puoi creare una copia da consegnare a un medico o a un ospedale. La destinazione deve essere una <strong>memoria esterna</strong>, per esempio una chiavetta USB, un SSD o un HDD esterno. Puoi scegliere di esportare soltanto il PDF della visita, il PDF insieme ai referti originali e alle immagini associate, oppure aggiungere anche gli eventuali esami DICOM collegati. I file vengono messi in cartelle separate e non serve installare Clinica Digitale sul computer della struttura sanitaria.</p>
 
-          <p><strong>38. Aggiungi documento.</strong> Nella parte alta del Dossier trovi un solo comando <strong>Aggiungi documento</strong>. Da lì puoi scegliere un file già presente sul computer, acquisire più pagine con la fotocamera oppure usare lo scanner locale. Non servono due comandi diversi.</p>
+          <p><strong>38. Aggiungi documento.</strong> Nella parte alta del Dossier trovi un solo comando <strong>Aggiungi documento</strong>. Da lì puoi scegliere un file già presente sul dispositivo oppure, dal telefono, fotografare una o più pagine: il Dossier trova i bordi del foglio, lo raddrizza e lo rende più leggibile. Lo scanner non si comanda dal browser: scansiona con il programma dello scanner e carica il file con Scegli file.</p>
 
           <p><strong>39. Immagini associate a un referto.</strong> Apri un referto e usa <strong>Allega immagini</strong> per collegare fotografie o immagini radiografiche in formato JPG, JPEG o PNG. Le immagini vengono copiate nell'<strong>Archivio immagini locale</strong> gestito da Clinica Digitale. Dalla stessa scheda puoi aprirle, ingrandirle, ruotarle e passare da una all'altra.</p>
 
@@ -4905,6 +4943,15 @@ const App = (() => {
   }
 
   async function openCameraCapture({single=false,title='Fotocamera documento',onComplete=null}={}) {
+    // Telefono e tablet: fotocamera vera del dispositivo, ritaglio e raddrizzamento del foglio (js/fotodoc.js)
+    if (globalThis.FotoDocumento?.isTelefono?.()) {
+      let files=null;
+      try {files=await FotoDocumento.acquisisci({single,title});} catch(error) {toast(error?.message||String(error));return;}
+      if(!files?.length)return;
+      if(single){if(onComplete)await onComplete(files);return;}
+      try {const pdf=await imageFilesToPdfFile(files,'referto_fotocamera');if(onComplete)await onComplete([pdf]);} catch(error) {toast(error?.message||String(error));}
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia) {
       const fallback=$('#cameraInput');
       if(fallback){fallback.click();return;}
@@ -4969,7 +5016,12 @@ const App = (() => {
     return new File([blob],data.fileName||`scanner_${Date.now()}.png`,{type:data.mimeType||'image/png'});
   }
 
+  function showScannerInfoWeb() {
+    openModal('Scanner','Il browser non può comandare direttamente lo scanner.',`<section><div class="notice">Scansiona il documento con il programma del tuo scanner e salvalo come PDF o come immagine. Poi caricalo nel Dossier con <strong>Scegli file</strong>.</div><div class="section-spacer"></div><div class="notice success">Con il telefono puoi anche fotografare il documento: il Dossier trova da solo i bordi del foglio, lo raddrizza e lo rende più leggibile.</div><div class="section-spacer"></div><div class="row-actions"><button type="button" class="btn btn-primary" id="scannerInfoOkBtn">Ho capito</button></div></section>`);
+    $('#scannerInfoOkBtn')?.addEventListener('click',closeModal);
+  }
   async function openScannerCapture({title='Scanner documento',onComplete=null}={}) {
+    showScannerInfoWeb();return;
     const overlay=document.createElement('div');overlay.className='capture-overlay';
     overlay.innerHTML=`<section class="capture-panel" role="dialog" aria-modal="true">
       <div class="capture-header"><div><h2>${esc(title)}</h2><p>Acquisisci una pagina alla volta. Al termine le pagine vengono riunite in un unico PDF.</p></div><button class="icon-btn" data-scan-close aria-label="Chiudi">×</button></div>
@@ -5007,11 +5059,7 @@ const App = (() => {
   }
 
   async function acquireHealthCardSide(side,source) {
-    if(source==='scanner') {
-      try {const file=await scanWithLocalScanner();await saveHealthCardImage(side,file);}
-      catch(error){toast(error.message);}
-      return;
-    }
+    if(source==='scanner') {showScannerInfoWeb();return;}
     await openCameraCapture({single:true,title:`Fotografa ${side==='front'?'il fronte':'il retro'} della tessera sanitaria`,onComplete:async files=>saveHealthCardImage(side,files[0])});
   }
 
@@ -5186,8 +5234,8 @@ const App = (() => {
     state.selectedFiles=[]; state.importQueue=[];
     openModal(state.importOptions.preferredCategory?`Importa ${state.importOptions.preferredCategory.toLowerCase()}`:'Importa e analizza documenti',`Profilo: ${activeProfile().firstName} ${activeProfile().lastName}`,`
       <div class="import-workspace">
-        <div class="file-drop" id="fileDrop"><strong>Acquisisci referti e documenti sanitari</strong><p class="kpi-note">Puoi caricare file, fotografare più pagine o usare uno scanner locale. L’analisi parte automaticamente e i campi secondari restano facoltativi.</p><input id="fileInput" type="file" multiple accept="application/pdf,image/jpeg,image/png,image/bmp,image/tiff" class="hidden"><input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden"><div class="acquisition-buttons"><button type="button" id="chooseFilesBtn" class="btn btn-primary">Scegli file</button><button type="button" id="cameraBtn" class="btn btn-light">Fotocamera multipagina</button><button type="button" id="scannerBtn" class="btn btn-light">Scanner locale</button></div><small>Per PDF con testo digitale il programma usa prima l’estrazione nativa, quando il componente è installato; le scansioni usano OCR locale a 3 passaggi.</small></div>
-        <div class="ocr-health ${(state.ocrHealth.ocrAvailable||state.ocrHealth.nativePdfAvailable||state.ocrHealth.ocrDeferred)?'ok':'error'}"><strong>${(state.ocrHealth.ocrAvailable||state.ocrHealth.nativePdfAvailable||state.ocrHealth.ocrDeferred)?'Motore del Dossier disponibile':'Motore del Dossier non disponibile'}</strong><span>${esc(state.ocrHealth.engine||'Motore Python locale')}${state.ocrHealth.nativePdfAvailable?' · lettura PDF attiva':' · motore PDF non disponibile'}${state.ocrHealth.scannerAvailable?' · scanner rilevato':' · scanner verificato al primo utilizzo'}</span></div>
+        <div class="file-drop" id="fileDrop"><strong>Acquisisci referti e documenti sanitari</strong><p class="kpi-note">Puoi caricare file o fotografare più pagine. L’analisi parte automaticamente e i campi secondari restano facoltativi.</p><input id="fileInput" type="file" multiple accept="application/pdf,image/jpeg,image/png,image/bmp,image/tiff" class="hidden"><input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden"><div class="acquisition-buttons"><button type="button" id="chooseFilesBtn" class="btn btn-primary">Scegli file</button><button type="button" id="cameraBtn" class="btn btn-light">Fotocamera multipagina</button><button type="button" id="scannerBtn" class="btn btn-light">Scanner locale</button></div><small>Per PDF con testo digitale il programma usa prima l’estrazione nativa, quando il componente è installato; le scansioni usano OCR locale a 3 passaggi.</small></div>
+        <div class="ocr-health ${(state.ocrHealth.ocrAvailable||state.ocrHealth.nativePdfAvailable||state.ocrHealth.ocrDeferred)?'ok':'error'}"><strong>${(state.ocrHealth.ocrAvailable||state.ocrHealth.nativePdfAvailable||state.ocrHealth.ocrDeferred)?'Motore del Dossier disponibile':'Motore del Dossier non disponibile'}</strong><span>${esc(state.ocrHealth.engine||'Motore Python locale')}${state.ocrHealth.nativePdfAvailable?' · lettura PDF attiva':' · motore PDF non disponibile'}</span></div>
         <div id="queueSummary"></div>
         <div id="importQueue" class="import-queue"></div>
         <div class="form-actions sticky-actions"><button type="button" class="btn btn-light" id="cancelModalBtn">Annulla</button><button type="button" class="btn btn-light" id="retryOcrBtn">Rianalizza errori</button><button type="button" class="btn btn-primary" id="archiveQueueBtn">Attendi analisi</button></div>
