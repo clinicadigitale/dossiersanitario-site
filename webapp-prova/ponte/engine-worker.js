@@ -121,15 +121,23 @@ async function operazioneMega(op,conn,a,dati){
   if(op==='about'){const i=await chiama(st,'getAccountInfo');return {ok:true,total:Number(i.spaceTotal)||0,used:Number(i.spaceUsed)||0,free:Math.max(0,(Number(i.spaceTotal)||0)-(Number(i.spaceUsed)||0))};}
   if(op==='list'){await aggiorna(st,false);const n=percorso?await cerca(st,percorso):st.root;if(!n||!n.directory)return nonTrovato(percorso,true);return {ok:true,items:elenca(n,a)};}
   if(op==='stat'){const n=percorso?await cerca(st,percorso):st.root;if(!n)return nonTrovato(percorso,false);return {ok:true,item:voce(n,n.name)};}
-  if(op==='read'){const n=await cerca(st,percorso);if(!n||n.directory)return nonTrovato(percorso,false);const b=await chiama(n,'downloadBuffer',{});return {ok:true,data:new Uint8Array(b.buffer,b.byteOffset,b.byteLength)};}
+  if(op==='read'){const n=await cerca(st,percorso);if(!n||n.directory)return nonTrovato(percorso,false);return {ok:true,data:await scaricaMega(n)};}
   if(op==='write'){await scrivi(st,percorso,dati);return {ok:true};}
   if(op==='mkdir'){await cartella(st,percorso);return {ok:true};}
   if(op==='delete'){const n=await cerca(st,percorso);if(!n)return nonTrovato(percorso,false);await chiama(n,'delete',false);return {ok:true};}
   if(op==='copy'||op==='move'){const n=await cerca(st,percorso);if(!n||n.directory)return nonTrovato(percorso,false);
-    const b=await chiama(n,'downloadBuffer',{});await scrivi(st,a.to,new Uint8Array(b.buffer,b.byteOffset,b.byteLength));
+    await scrivi(st,a.to,await scaricaMega(n));
     if(op==='move'){try{await chiama(n,'delete',false);}catch(_e){}}return {ok:true};}
   return {ok:false,code:'error',error:'operazione cloud non disponibile: '+op};
 }
+async function scaricaMega(n){
+  if(typeof n.download!=='function'){const b=await chiama(n,'downloadBuffer',{});return new Uint8Array(b.buffer,b.byteOffset,b.byteLength);}
+  return await new Promise((ok,ko)=>{let s;try{s=n.download({});}catch(e){ko(e);return;}
+    const parti=[];let tot=0,ultimo=0;const totale=Number(n.size)||0;
+    const avvisa=(car,fine)=>{const ora=Date.now();if(!fine&&ora-ultimo<400)return;ultimo=ora;try{postMessage({tipo:'cloudProgresso',caricati:car,totale:totale||car});}catch(_){}};
+    s.on('data',c=>{const u=c instanceof Uint8Array?c:new Uint8Array(c);parti.push(u);tot+=u.length;avvisa(tot,false);});
+    s.on('error',ko);
+    s.on('end',()=>{avvisa(tot,true);const out=new Uint8Array(tot);let o=0;for(const u of parti){out.set(u,o);o+=u.length;}ok(out);});});}
 self.cloudOp=async(op,connJson,argsJson,dati)=>{
   const conn=JSON.parse(connJson),a=JSON.parse(argsJson||'{}');
   const corpo=dati?new Uint8Array(dati):null;

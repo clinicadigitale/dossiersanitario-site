@@ -12,9 +12,10 @@
     if(worker)return worker;
     // Il motore parte da un piccolo avvio interno alla pagina: cosi' eredita sempre l'isolamento
     // della pagina (serve per usare piu' processori) senza dipendere dalle intestazioni del file.
-    const avvio=new Blob(["importScripts("+JSON.stringify(base+'engine-worker.js?v=web11')+");"],{type:'text/javascript'});
+    const avvio=new Blob(["importScripts("+JSON.stringify(base+'engine-worker.js?v=web12')+");"],{type:'text/javascript'});
     worker=new Worker(URL.createObjectURL(avvio));
     worker.onmessage=e=>{const m=e.data||{};
+      if(m.tipo==='cloudProgresso'){try{window.dispatchEvent(new CustomEvent('dossier-cloud-progresso',{detail:m}));}catch(_){}return;}
       if(m.tipo==='stato'){mostraStato(m.testo,m.fine,m.errore);if(m.fine)pronto=true;return;}
       const a=attese.get(m.id);if(!a)return;attese.delete(m.id);
       if(m.errore){a.reject(new TypeError('Motore del Dossier: '+m.errore));return;}

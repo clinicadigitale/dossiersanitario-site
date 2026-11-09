@@ -133,7 +133,9 @@ const DossierCloud = (() => {
   }
   const download=(remote)=>request(`/download?remote=${encodeURIComponent(remote)}`);
   async function downloadStream(remote,onProgress){
-    const start=await postJson('/download-start',{remote});
+    const ascolta=e=>{const d=e.detail||{};const tot=Math.max(0,Number(d.totale)||0),car=Math.max(0,Number(d.caricati)||0);if(tot>0)onProgress?.(car,tot,Math.min(100,Math.round(car/tot*100)));};
+    window.addEventListener('dossier-cloud-progresso',ascolta);
+    let start;try{start=await postJson('/download-start',{remote});}finally{window.removeEventListener('dossier-cloud-progresso',ascolta);}
     const jobId=String(start.jobId||'');if(!jobId)throw new Error('Impossibile preparare il download cloud.');
     let total=0,sha256='';
     try{
