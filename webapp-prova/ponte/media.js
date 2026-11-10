@@ -106,7 +106,7 @@
     if(c?.pronto?.()){
       let errore=null;
       for(let i=0;i<3&&!caricato;i++){try{await c.carica(kind,pid,owner,rel,blob);caricato=true;}catch(e){errore=e;await new Promise(r=>setTimeout(r,800*(i+1)));}}
-      if(!caricato){if(inRipristino)throw errore||new Error('Invio del file al cloud non riuscito');await metti('attesa',k,{kind,pid,owner,rel,at:Date.now()});}
+      if(!caricato){console.warn('Invio al cloud rinviato:',k,errore);await metti('attesa',k,{kind,pid,owner,rel,at:Date.now()});}
     }
     const r=await radice();
     if(r){await scriviCartella(r,segs,blob);}

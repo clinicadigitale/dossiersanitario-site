@@ -142,7 +142,9 @@ self.cloudOp=async(op,connJson,argsJson,dati)=>{
   const conn=JSON.parse(connJson),a=JSON.parse(argsJson||'{}');
   const corpo=dati?new Uint8Array(dati):null;
   try{
-    if(conn.type==='mega')return await operazioneMega(op,conn,a,corpo);
+    // tempo massimo per ogni operazione: un trasferimento rimasto appeso non deve bloccare tutto il Dossier
+    const limite=120000+Math.round((corpo?corpo.byteLength:0)/40);let timer;
+    if(conn.type==='mega')return await Promise.race([operazioneMega(op,conn,a,corpo),new Promise(r=>{timer=setTimeout(()=>r({ok:false,code:'error',error:'Tempo scaduto per l’operazione su MEGA ('+op+')'}),limite);})]).finally(()=>clearTimeout(timer));
     return {ok:false,code:'error',error:'Servizio cloud non ancora disponibile nel browser'};
   }catch(e){const t=String(e&&e.message||e);return {ok:false,code:/not found|ENOENT/i.test(t)?'notfound':'error',error:t};}
 };
