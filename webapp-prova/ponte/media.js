@@ -178,22 +178,30 @@
   // ---------- richiesta di scelta o ricollegamento della cartella ----------
   let avvisoMostrato=false;
   function avvisaCartella(forza=false){
-    if(!forza&&(avvisoMostrato||cloud()?.inRipristino?.()))return Promise.resolve();
-    if(!conCartella()||document.getElementById('mediaCartellaAvviso'))return Promise.resolve();
-    try{if(!window.DossierSecurity?.currentUser?.())return Promise.resolve();}catch(_){return Promise.resolve();}
+    if(!forza&&(avvisoMostrato||cloud()?.inRipristino?.()))return Promise.resolve(false);
+    if(!conCartella()||document.getElementById('mediaCartellaAvviso'))return Promise.resolve(false);
+    try{if(!window.DossierSecurity?.currentUser?.())return Promise.resolve(false);}catch(_){return Promise.resolve(false);}
     avvisoMostrato=true;
     return new Promise(fine=>leggi('chiavi','radice').then(h=>{
       const nuovo=!h;const o=document.createElement('div');o.id='mediaCartellaAvviso';
       o.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(15,40,34,.45);display:flex;align-items:center;justify-content:center;padding:16px';
-      o.innerHTML=`<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;padding:22px;font:15px/1.5 system-ui,sans-serif;color:#1f3b34;box-shadow:0 12px 40px rgba(0,0,0,.25)"><h3 style="margin:0 0 8px;font-size:19px">${nuovo?'Cartella dell’archivio su questo computer':'Ricollega la cartella dell’archivio'}</h3><p style="margin:0 0 14px">${nuovo?`Il Dossier tiene DICOM e immagini nella cartella <strong>${NOME_CARTELLA}</strong>. Scegli dove crearla: ti consigliamo <strong>Documenti</strong>. Va fatto una sola volta su questo computer.`:`Il browser chiede di nuovo il permesso per la cartella <strong>${NOME_CARTELLA}</strong>. Se compare la scelta, seleziona <strong>Consenti a ogni visita</strong>.`}</p><div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button type="button" data-dopo style="padding:9px 14px;border-radius:10px;border:1px solid #cfd8d5;background:#fff;cursor:pointer">Più tardi</button><button type="button" data-ok style="padding:9px 14px;border-radius:10px;border:0;background:#0f6f5c;color:#fff;font-weight:600;cursor:pointer">${nuovo?'Scegli dove crearla':'Ricollega'}</button></div></div>`;
+      const testo=nuovo?`Il Dossier tiene DICOM e immagini nella cartella <strong>${NOME_CARTELLA}</strong>. Scegli dove crearla: ti consigliamo <strong>Documenti</strong>. Va fatto una sola volta su questo computer.`:`Il browser chiede di nuovo il permesso per la cartella <strong>${NOME_CARTELLA}</strong>. Se compare la scelta, seleziona <strong>Consenti a ogni visita</strong>.`;
+      const extra=forza?'<br><br>Il collegamento all’archivio cloud parte solo dopo che la cartella è stata scelta.':'';
+      o.innerHTML=`<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;padding:22px;font:15px/1.5 system-ui,sans-serif;color:#1f3b34;box-shadow:0 12px 40px rgba(0,0,0,.25)"><h3 style="margin:0 0 8px;font-size:19px">${nuovo?'Cartella dell’archivio su questo computer':'Ricollega la cartella dell’archivio'}</h3><p style="margin:0 0 10px">${testo}${extra}</p><p data-esito style="margin:0 0 12px;color:#9b1c1c;font-weight:600;display:none"></p><div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button type="button" data-dopo style="padding:9px 14px;border-radius:10px;border:1px solid #cfd8d5;background:#fff;cursor:pointer">${forza?'Annulla':'Più tardi'}</button><button type="button" data-ok style="padding:9px 14px;border-radius:10px;border:0;background:#0f6f5c;color:#fff;font-weight:600;cursor:pointer">${nuovo?'Scegli dove crearla':'Ricollega'}</button></div></div>`;
       document.body.appendChild(o);
-      o.querySelector('[data-dopo]').onclick=()=>{o.remove();fine();};
-      o.querySelector('[data-ok]').onclick=async()=>{try{if(nuovo)await scegliCartella();else{const ok=await radice({chiedi:true});if(ok)setTimeout(()=>void allinea(),1000);}}catch(e){alert('Cartella non collegata: '+(e?.message||e));}o.remove();fine();};
-    }).catch(()=>fine()));
+      const esito=o.querySelector('[data-esito]');
+      o.querySelector('[data-dopo]').onclick=()=>{o.remove();fine(false);};
+      o.querySelector('[data-ok]').onclick=async()=>{
+        let ok=false;
+        try{if(nuovo){const r=await scegliCartella();ok=!r?.cancelled&&!!(await radice());}else{ok=!!(await radice({chiedi:true}));if(ok)setTimeout(()=>void allinea(),1000);}}
+        catch(e){esito.textContent='Cartella non collegata: '+(e?.message||e);esito.style.display='block';return;}
+        if(!ok){esito.textContent='Nessuna cartella scelta. Clicca di nuovo il pulsante verde per sceglierla'+(forza?', oppure Annulla per non collegare l’archivio.':'.');esito.style.display='block';return;}
+        o.remove();fine(true);};
+    }).catch(()=>fine(false)));
   }
-  // Prima di un collegamento o ripristino dal cloud: su computer la cartella va scelta subito,
-  // cosi' DICOM e immagini finiscono direttamente li'.
-  async function assicuraCartella(){if(!conCartella())return;const h=await leggi('chiavi','radice').catch(()=>null);if(h&&await radice())return;await avvisaCartella(true);}
+  // Prima di un collegamento o ripristino dal cloud: su computer la cartella e' obbligatoria,
+  // cosi' DICOM e immagini finiscono direttamente li'. Restituisce false se l'utente rinuncia.
+  async function assicuraCartella(){if(!conCartella())return true;const h=await leggi('chiavi','radice').catch(()=>null);if(h&&await radice())return true;return await avvisaCartella(true);}
   async function verificaCartella(){
     if(!conCartella())return;const h=await leggi('chiavi','radice').catch(()=>null);
     if(!h){if(cloud()?.pronto?.())avvisaCartella();return;}
