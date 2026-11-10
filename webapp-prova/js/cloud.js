@@ -321,15 +321,20 @@ const DossierCloud = (() => {
 
   async function createManifest(row){const manifest={app:'Dossier Sanitario Locale',format:'DSL5-CLOUD',archiveId:row.archiveId,displayName:row.displayName,provider:row.provider,basePath:cleanBasePath(row.basePath),createdAt:row.createdAt,version:'5.0.0',mediaFormat:MEDIA_FORMAT};row.mediaFormat=MEDIA_FORMAT;await upload(cloudPath('archive.json',row),new Blob([JSON.stringify(manifest)],{type:'application/json'}));}
   async function setManifestMediaFormat(row){const blob=await download(cloudPath('archive.json',row));const manifest=JSON.parse(await blob.text());if(manifest.format!=='DSL5-CLOUD'||manifest.archiveId!==row.archiveId)throw new Error('Manifesto archivio non valido');if(manifest.mediaFormat===MEDIA_FORMAT)return;manifest.mediaFormat=MEDIA_FORMAT;manifest.mediaFormatSince=new Date().toISOString();await upload(cloudPath('archive.json',row),new Blob([JSON.stringify(manifest)],{type:'application/json'}));}
-  function mediaCtx(){if(mediaContext)return mediaContext;if(settings?.enabled&&settings.mediaFormat===MEDIA_FORMAT&&settings.archiveId&&settings.remoteName)return{row:settings,key:null};return null;}
+  function mediaCtx(){if(mediaContext)return mediaContext;if(settings?.enabled&&(settings.mediaFormat===MEDIA_FORMAT||settings.mediaMigrationPending)&&settings.archiveId&&settings.remoteName)return{row:settings,key:null};return null;}
+  // Canale diretto verso MEGA (in parallelo, fuori dalla coda del motore); se non e' pronto si usa la via normale.
+  async function diretto(remote,op,dati){const f=window.DossierPonteWeb?.cloudDiretta;if(!f)return null;const r=await f(remote,op,dati);if(r?.code==='nonpronto')return null;return r;}
   async function mediaKeyBytes(ctx){return ctx.key||masterKey(ctx.row,{promptIfMissing:false});}
   async function mediaHex(keyBytes,archiveId,text){let k=mediaHmacCache.get(archiveId);if(!k){k=await crypto.subtle.importKey('raw',keyBytes,{name:'HMAC',hash:'SHA-256'},false,['sign']);mediaHmacCache.set(archiveId,k);}const sig=new Uint8Array(await crypto.subtle.sign('HMAC',k,new TextEncoder().encode('dossier-media|'+text)));return Array.from(sig.subarray(0,16),b=>b.toString(16).padStart(2,'0')).join('');}
   async function mediaRemote(ctx,keyBytes,kind,pid,owner,rel){const id=ctx.row.archiveId,k=kind==='dicom'?'dicom':'image';const dir=`media/${k}/${await mediaHex(keyBytes,id,'p|'+pid)}/${await mediaHex(keyBytes,id,'o|'+k+'|'+pid+'|'+owner)}`;return{dir,file:rel==null?'':`${dir}/${await mediaHex(keyBytes,id,'f|'+k+'|'+pid+'|'+owner+'|'+rel)}.dslm`};}
   const mediaApi={
     pronto:()=>!!mediaCtx(),
+    inPassaggio:()=>!!settings?.mediaMigrationPending,
+    async passaggioTerminato(){if(!settings?.mediaMigrationPending)return false;await setManifestMediaFormat(settings);settings.mediaFormat=MEDIA_FORMAT;settings.mediaMigrationPending=false;settings.mediaSnapshotRequired=true;await DossierDB.put('cloudSettings',settings,{audit:false,sync:false});applySyncContext();return true;},
     inRipristino:()=>!!mediaContext,
-    async carica(kind,pid,owner,rel,blob){const ctx=mediaCtx();if(!ctx)throw new Error('Archivio cloud non attivo');const key=await mediaKeyBytes(ctx);const r=await mediaRemote(ctx,key,kind,pid,owner,rel);const enc=await encryptBlob(blob,key,{kind:'media',mediaKind:kind});await upload(cloudPath(r.file,ctx.row),enc);return true;},
-    async scarica(kind,pid,owner,rel){const ctx=mediaCtx();if(!ctx)return null;const key=await mediaKeyBytes(ctx);const r=await mediaRemote(ctx,key,kind,pid,owner,rel);let enc;try{enc=await download(cloudPath(r.file,ctx.row));}catch(error){if(/non trovat|not ?found|404|doesn.t exist/i.test(String(error?.message||'')))return null;throw error;}const out=await decryptBlob(enc,key);return out.blob;},
+    async carica(kind,pid,owner,rel,blob){const ctx=mediaCtx();if(!ctx)throw new Error('Archivio cloud non attivo');const key=await mediaKeyBytes(ctx);const r=await mediaRemote(ctx,key,kind,pid,owner,rel);const enc=await encryptBlob(blob,key,{kind:'media',mediaKind:kind});const remote=cloudPath(r.file,ctx.row);const d=await diretto(remote,'write',await enc.arrayBuffer());if(d){if(!d.ok)throw new Error(d.error||'Invio a MEGA non riuscito');return true;}await upload(remote,enc);return true;},
+    async scarica(kind,pid,owner,rel){const ctx=mediaCtx();if(!ctx)return null;const key=await mediaKeyBytes(ctx);const r=await mediaRemote(ctx,key,kind,pid,owner,rel);const remote=cloudPath(r.file,ctx.row);const d=await diretto(remote,'read');if(d){if(!d.ok){if(/notfound/.test(String(d.code||''))||/non trovat/i.test(String(d.error||'')))return null;throw new Error(d.error||'Lettura da MEGA non riuscita');}const out=await decryptBlob(new Blob([d.data]),key);return out.blob;}
+      let enc;try{enc=await download(remote);}catch(error){if(/non trovat|not ?found|404|doesn.t exist/i.test(String(error?.message||'')))return null;throw error;}const out=await decryptBlob(enc,key);return out.blob;},
     async eliminaProprietario(kind,pid,owner){const ctx=mediaCtx();if(!ctx)return 0;const key=await mediaKeyBytes(ctx);const r=await mediaRemote(ctx,key,kind,pid,owner,null);let items=[];try{items=(await get(`/list?remote=${encodeURIComponent(cloudPath(r.dir,ctx.row))}`)).items||[];}catch{return 0;}let n=0;for(const it of items){if(it.IsDir)continue;await deleteRemote(cloudPath(`${r.dir}/${it.Path||it.Name}`,ctx.row)).catch(()=>{});n++;}return n;}
   };
   async function checkMediaFormat(){if(mediaFormatChecked||!settings?.enabled||settings.mediaFormat===MEDIA_FORMAT)return;mediaFormatChecked=true;try{const manifest=JSON.parse(await (await download(cloudPath('archive.json',settings))).text());if(manifest.mediaFormat===MEDIA_FORMAT){settings.mediaFormat=MEDIA_FORMAT;await DossierDB.put('cloudSettings',settings,{audit:false,sync:false});applySyncContext();}}catch(error){mediaFormatChecked=false;console.warn('Formato media non verificato:',error);}}
@@ -353,6 +358,9 @@ const DossierCloud = (() => {
     }
   }
   async function uploadSnapshot(row,keyBytes,onProgress){
+    // durante il passaggio di DICOM e immagini al nuovo formato non si creano copie complete:
+    // l'ultima copia valida resta quella che li contiene ancora tutti.
+    if(row?.mediaMigrationPending)return null;
     const includeMediaArchive=!!row.includeMediaArchive&&row.mediaFormat!==MEDIA_FORMAT;
     const mediaFingerprint=includeMediaArchive?await mediaArchiveFingerprint():'';
     const retrying=!!row.pendingSnapshotName;
@@ -413,8 +421,7 @@ const DossierCloud = (() => {
       // Riproduce tutti i pacchetti confermati, di tutti i dispositivi, fino all'ultimo disponibile.
       const received=await downloadChanges(row,raw,progress,{includeOwn:true,afterMs:0,strict:true});
       if(received.deferred)throw new Error(`Recupero cloud incompleto: ${received.deferred} pacchetti non sono stati scaricati.`);
-      if(manifestMediaFormat!==MEDIA_FORMAT){recoveryUi.update(94,'Archivio immagini','Registrazione del nuovo formato per DICOM e immagini.');await setManifestMediaFormat(row);row.mediaSnapshotRequired=true;}
-      row.mediaFormat=MEDIA_FORMAT;mediaContext=null;
+      if(manifestMediaFormat!==MEDIA_FORMAT)row.mediaMigrationPending=true;else row.mediaFormat=MEDIA_FORMAT;mediaContext=null;
       recoveryUi.update(95,'Verifica finale','Controllo del Dossier ricostruito e preparazione dell’accesso.');
       row.lastSnapshotAt=snapshotMs?new Date(snapshotMs).toISOString():new Date().toISOString();row.lastSyncAt=new Date().toISOString();row.lastError='';row.recoveryCheckpoint=new Date().toISOString();
       // Rimane disattivato durante il refresh: eventuali scritture interne non devono diventare modifiche da inviare.
@@ -962,8 +969,7 @@ Conservare separatamente dal computer e dal cloud. Chi possiede questa chiave pu
     mediaContext={row,key:raw};let restored;
     try{restored=await App.restoreZip(decoded.blob,{mode:'full',replaceAll:true,importUsers:false,skipSafetyBackup:true,skipSafetyDownload:true,skipRefresh:true,onProgress:x=>{const pc=Math.max(0,Math.min(100,Number(x?.percent)||0));onProgress?.(55+pc*.27,x?.phase||'Ripristino',x?.detail||'');}});
     if(!restored)throw new Error('Ripristino del Dossier familiare non completato.');
-    if(manifestMediaFormat!==MEDIA_FORMAT){await setManifestMediaFormat(row);row.mediaSnapshotRequired=true;}
-    row.mediaFormat=MEDIA_FORMAT;}finally{mediaContext=null;}
+    if(manifestMediaFormat!==MEDIA_FORMAT)row.mediaMigrationPending=true;else row.mediaFormat=MEDIA_FORMAT;}finally{mediaContext=null;}
     onProgress?.(82,'Configurazione sincronizzazione','Associazione permanente di questo dispositivo.');
     await DossierDB.clear('syncQueue');row.enabled=true;row.lastSnapshotAt=new Date().toISOString();row.lastSnapshotName=String(snap.Path||snap.Name||'').split('/').pop();
     await DossierDB.put('cloudSettings',row,{audit:false,sync:false});settings=row;applySyncContext();await DossierSecurity.registerCurrentDevice({sync:true});

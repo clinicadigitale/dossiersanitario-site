@@ -8,13 +8,16 @@
   const isMotore=u=>{try{const x=new URL(u,location.href);return x.port===PORTA||/^127\.0\.0\.1$|^localhost$/.test(x.hostname)&&x.port===PORTA;}catch(_e){return false;}};
   const base=(document.currentScript&&document.currentScript.src)?new URL('.',document.currentScript.src).href:new URL('ponte/',location.href).href;
   let worker=null,seq=0;const attese=new Map();let pronto=false;
+  const diretti=new Map();let seqDiretti=0;
+  function cloudDiretta(remote,op,dati){if(!worker||!pronto)return Promise.resolve({ok:false,code:'nonpronto',error:'Motore non pronto'});const id='c'+(++seqDiretti);return new Promise(r=>{diretti.set(id,r);const t=dati instanceof ArrayBuffer?[dati]:[];worker.postMessage({tipo:'cloudDiretta',id,remote,op,dati},t);});}
   function avvia(){
     if(worker)return worker;
     // Il motore parte da un piccolo avvio interno alla pagina: cosi' eredita sempre l'isolamento
     // della pagina (serve per usare piu' processori) senza dipendere dalle intestazioni del file.
-    const avvio=new Blob(["importScripts("+JSON.stringify(base+'engine-worker.js?v=web14')+");"],{type:'text/javascript'});
+    const avvio=new Blob(["importScripts("+JSON.stringify(base+'engine-worker.js?v=web15')+");"],{type:'text/javascript'});
     worker=new Worker(URL.createObjectURL(avvio));
     worker.onmessage=e=>{const m=e.data||{};
+      if(m.tipo==='cloudDiretta'){const d=diretti.get(m.id);if(d){diretti.delete(m.id);d(m.esito||{ok:false,error:'Risposta vuota'});}return;}
       if(m.tipo==='cloudProgresso'){try{window.dispatchEvent(new CustomEvent('dossier-cloud-progresso',{detail:m}));}catch(_){}return;}
       if(m.tipo==='stato'){mostraStato(m.testo,m.fine,m.errore);if(m.fine)pronto=true;return;}
       const a=attese.get(m.id);if(!a)return;attese.delete(m.id);
@@ -279,5 +282,5 @@
   }
   document.addEventListener('DOMContentLoaded',()=>{if(!pronto)mostraStato('Preparazione del motore del Dossier nel browser…');});
   avvia();
-  window.DossierPonteWeb={pronto:()=>pronto};
+  window.DossierPonteWeb={pronto:()=>pronto,cloudDiretta};
 })();

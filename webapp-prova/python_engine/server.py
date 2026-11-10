@@ -5719,6 +5719,8 @@ def cloud_upload_worker(job_id: str, temp_path: str, remote: str, total_bytes: i
 
 def _friendly_cloud_error(exc: Exception) -> str:
     raw = str(exc or "").strip()
+    if raw:
+        print("Errore cloud originale:", raw[:600])
     low = raw.lower()
     if "source doesn't exist or is a directory and destination is a file" in low:
         return "Un file dell’archivio cloud non è stato letto correttamente. Le modifiche locali restano in attesa e la sincronizzazione può essere riprovata."

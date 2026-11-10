@@ -59,7 +59,8 @@
   // ---------- memoria temporanea nel browser ----------
   const tetto=()=>telefono()?TETTO_TELEFONO:TETTO_COMPUTER_SENZA_CARTELLA;
   async function leggiCache(k){const b=await leggi('cache',k).catch(()=>null);if(!b)return null;const i=await leggi('indice',k).catch(()=>null);if(i){i.uso=Date.now();metti('indice',k,i).catch(()=>{});}return b;}
-  async function scriviCache(k,blob,caricato){await metti('cache',k,blob);await metti('indice',k,{dimensione:blob.size,uso:Date.now(),caricato:!!caricato});await sfoltisci();}
+  let ultimoSfoltimento=0;
+  async function scriviCache(k,blob,caricato){await metti('cache',k,blob);await metti('indice',k,{dimensione:blob.size,uso:Date.now(),caricato:!!caricato});if(!cloud()?.inRipristino?.()&&Date.now()-ultimoSfoltimento>15000){ultimoSfoltimento=Date.now();await sfoltisci();}}
   async function eliminaCache(prefisso){for(const k of await chiavi('indice'))if(k===prefisso||String(k).startsWith(prefisso+'/')){await togli('cache',k).catch(()=>{});await togli('indice',k).catch(()=>{});}}
   async function segnaCaricato(k){const i=await leggi('indice',k).catch(()=>null);if(i){i.caricato=true;await metti('indice',k,i);}}
   async function sfoltisci(){
@@ -103,15 +104,18 @@
     const segs=segmenti(kind,pid,owner,rel),k=segs.join('/');const c=cloud();
     const inRipristino=!!c?.inRipristino?.();
     let caricato=false;
-    if(c?.pronto?.()){
+    // durante un collegamento i file si salvano solo qui e partono verso il cloud subito dopo, in sottofondo
+    if(!inRipristino&&c?.pronto?.()){
       let errore=null;
-      for(let i=0;i<3&&!caricato;i++){try{await c.carica(kind,pid,owner,rel,blob);caricato=true;}catch(e){errore=e;await new Promise(r=>setTimeout(r,800*(i+1)));}}
-      if(!caricato){console.warn('Invio al cloud rinviato:',k,errore);await metti('attesa',k,{kind,pid,owner,rel,at:Date.now()});}
+      for(let i=0;i<3&&!caricato;i++){try{await c.carica(kind,pid,owner,rel,blob);caricato=true;}catch(e){errore=e;await new Promise(r=>setTimeout(r,[2000,6000,15000][i]));}}
+      if(!caricato)console.warn('Invio al cloud rinviato:',k,errore);
     }
+    if(!caricato&&(inRipristino||c?.pronto?.()))await metti('attesa',k,{kind,pid,owner,rel,at:Date.now()});
     const r=await radice();
     if(r){await scriviCartella(r,segs,blob);}
-    else if(!(inRipristino&&caricato)){await scriviCache(k,blob,caricato);}
+    else{await scriviCache(k,blob,caricato);}
     if(!r&&!inRipristino&&conCartella())avvisaCartella();
+    if(!caricato&&!inRipristino)setTimeout(()=>void riprovaAttese(),5000);
     return {ok:true,savedBytes:blob.size,archive:'ArchivioLocale',relativePath:String(rel||''),savedPath:k};
   }
   async function apri(kind,pid,owner,rel){
@@ -139,13 +143,24 @@
 
   async function eliminaLocale(kind,pid,owner){try{const segs=segmenti(kind,pid,owner),k=segs.join('/');const r=await radice();if(r)await eliminaCartella(r,segs);await eliminaCache(k);}catch(e){console.warn('Pulizia locale media rinviata:',e);}}
 
-  // ---------- invii rimasti in attesa ----------
+  // ---------- invii in sospeso (anche il passaggio dei DICOM dell'exe al nuovo formato) ----------
   let riprovaInCorso=false;
   async function riprovaAttese(){
     const c=cloud();if(riprovaInCorso||!c?.pronto?.()||c?.inRipristino?.())return;riprovaInCorso=true;
-    try{for(const k of await chiavi('attesa')){const a=await leggi('attesa',k);if(!a)continue;const segs=String(k).split('/');const r=await radice();let b=r?await leggiCartella(r,segs):null;if(!b)b=await leggi('cache',k).catch(()=>null);if(!b){await togli('attesa',k);continue;}
-      try{await c.carica(a.kind,a.pid,a.owner,a.rel,b);await togli('attesa',k);await segnaCaricato(k);}catch(e){console.warn('Invio media rinviato:',e);break;}}}
-    finally{riprovaInCorso=false;}
+    let fatti=0,errori=0;
+    try{
+      const lista=await chiavi('attesa');const totale=lista.length;
+      if(totale)mostra(`Invio di DICOM e immagini al cloud: 0 / ${totale}`);
+      let indice=0;
+      const lavora=async()=>{while(indice<lista.length&&errori<20){const k=lista[indice++];const a=await leggi('attesa',k);if(!a)continue;const segs=String(k).split('/');const r=await radice();let b=r?await leggiCartella(r,segs):null;if(!b)b=await leggi('cache',k).catch(()=>null);if(!b){await togli('attesa',k);fatti++;continue;}
+        let ok=false;for(let t=0;t<3&&!ok;t++){try{await c.carica(a.kind,a.pid,a.owner,a.rel,b);ok=true;}catch(e){if(t===2){console.warn('Invio media rinviato:',k,e);errori++;}else await new Promise(x=>setTimeout(x,[3000,10000][t]));}}
+        if(ok){await togli('attesa',k);await segnaCaricato(k);fatti++;mostra(`Invio di DICOM e immagini al cloud: ${fatti} / ${totale}`);}}};
+      await Promise.all([lavora(),lavora(),lavora(),lavora()]);
+      const restano=(await chiavi('attesa')).length;
+      if(!restano&&c.inPassaggio?.()){try{await c.passaggioTerminato();mostra('DICOM e immagini sono ora nel cloud come file separati.',true);}catch(e){console.warn('Chiusura del passaggio rinviata:',e);}}
+      else if(totale)mostra(restano?`Invio al cloud: ${fatti} file inviati, ${restano} in attesa (nuovo tentativo tra poco)`:`Invio al cloud completato: ${fatti} file`,true);
+      if(!restano)await sfoltisci().catch(()=>{});
+    }finally{riprovaInCorso=false;}
   }
 
   // ---------- copia completa nella cartella del computer ----------
@@ -234,7 +249,7 @@
     }
   }
 
-  setInterval(()=>{void riprovaAttese();},120000);
+  setInterval(()=>{void riprovaAttese();},60000);
   // controllo dopo l'accesso: ogni 30 secondi finche' non trova un utente collegato
   const controllo=setInterval(()=>{try{if(window.DossierSecurity?.currentUser?.()){clearInterval(controllo);setTimeout(()=>void verificaCartella(),8000);}}catch(_){}},30000);
   window.DossierMediaWeb={_chiaviCache:()=>chiavi('indice'),eliminaLocale,assicuraCartella,gestisci,stato,scegliCartella,allinea,riprovaAttese,verificaCartella,elencoFile,_cache:{leggiCache,scriviCache,sfoltisci}};

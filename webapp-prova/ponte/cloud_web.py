@@ -86,7 +86,7 @@ def _parametri(nome, args):
         raise _errore(1, f"Connessione cloud non trovata: {nome}", args)
     tipo = str(conn.get("type") or "")
     if tipo == "mega":
-        return {"type": "mega", "user": str(conn.get("user") or ""), "pass": rivela(conn.get("pass") or "")}
+        return {"type": "mega", "name": nome, "user": str(conn.get("user") or ""), "pass": rivela(conn.get("pass") or "")}
     if tipo == "drive":
         return {"type": "drive", "token": str(conn.get("token") or ""), "client_id": str(conn.get("client_id") or ""), "client_secret": str(conn.get("client_secret") or "")}
     raise _errore(1, "Servizio cloud non disponibile nel browser", args)

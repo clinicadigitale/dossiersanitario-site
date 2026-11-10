@@ -103,12 +103,16 @@ function elenca(n,{recursive,filesOnly,dirsOnly},prefisso='',out=[]){
     else if(!dirsOnly)out.push(voce(f,p));}
   return out;
 }
+// le cartelle si creano una alla volta: con piu' invii insieme non devono nascere doppioni
+let catenaCartelle=Promise.resolve();
+function inFila(fn){const p=catenaCartelle.then(fn,fn);catenaCartelle=p.catch(()=>{});return p;}
+const connessioni=new Map();
 async function cartella(st,percorso){let n=st.root;for(const nome of parti(percorso)){let c=ultimo(figli(n).filter(x=>x.name===nome&&x.directory));if(!c)c=await chiama(n,'mkdir',nome);n=c;}return n;}
 async function aggiorna(st,forza){if(typeof st.reload!=='function')return;if(forza||Date.now()-(st.__ricarica||0)>5*60*1000){await chiama(st,'reload',true);st.__ricarica=Date.now();}}
 async function cerca(st,percorso){let n=trova(st,percorso);if(!n){await aggiorna(st,true);n=trova(st,percorso);}return n;}
 function nonTrovato(percorso,cartellaAttesa){return {ok:false,code:cartellaAttesa?'notfound_dir':'notfound',error:'non trovato: '+percorso};}
 async function scrivi(st,percorso,dati){
-  const p=parti(percorso),nome=p.pop();const dir=await cartella(st,p.join('/'));
+  const p=parti(percorso),nome=p.pop();const dir=await inFila(()=>cartella(st,p.join('/')));
   const vecchi=figli(dir).filter(x=>x.name===nome&&!x.directory);
   await dir.upload({name:nome,size:dati.byteLength,allowUploadBuffering:true},dati).complete;
   for(const v of vecchi){try{await chiama(v,'delete',false);}catch(_e){}}
@@ -139,7 +143,7 @@ async function scaricaMega(n){
     s.on('error',ko);
     s.on('end',()=>{avvisa(tot,true);const out=new Uint8Array(tot);let o=0;for(const u of parti){out.set(u,o);o+=u.length;}ok(out);});});}
 self.cloudOp=async(op,connJson,argsJson,dati)=>{
-  const conn=JSON.parse(connJson),a=JSON.parse(argsJson||'{}');
+  const conn=JSON.parse(connJson),a=JSON.parse(argsJson||'{}');if(conn&&conn.name)connessioni.set(conn.name,conn);
   const corpo=dati?new Uint8Array(dati):null;
   try{
     // tempo massimo per ogni operazione: un trasferimento rimasto appeso non deve bloccare tutto il Dossier
@@ -210,5 +214,7 @@ onmessage=e=>{const m=e.data||{};
   if(m.tipo==='caratteri'){coda=coda.then(async()=>{const lista=(m.lista||[]).map(c=>({nome:c.nome,dati:new Uint8Array(c.dati)}));
       if(self.pdfiumPonte)self.pdfiumPonte.impostaCaratteri(lista);else caratteriInAttesa.push(...lista);
       postMessage({tipo:'caratteri',n:lista.length});}).catch(()=>{});return;}
+  // operazioni cloud dirette (DICOM e immagini): non passano dalla coda del motore e possono andare in parallelo
+  if(m.tipo==='cloudDiretta'){(async()=>{const r=String(m.remote||''),i=r.indexOf(':');const conn=i>0?connessioni.get(r.slice(0,i)):null;if(!conn)return {ok:false,code:'nonpronto',error:'Collegamento cloud non ancora pronto'};return self.cloudOp(m.op,JSON.stringify(conn),JSON.stringify({path:r.slice(i+1)}),m.dati||null);})().then(es=>{const t=es&&es.data&&es.data.buffer?[es.data.buffer]:[];postMessage({tipo:'cloudDiretta',id:m.id,esito:es},t);}).catch(err=>postMessage({tipo:'cloudDiretta',id:m.id,esito:{ok:false,code:'error',error:String(err&&err.message||err)}}));return;}
   if(m.tipo==='richiesta'){coda=coda.then(()=>esegui(m)).then(r=>postMessage({id:m.id,...r},[r.corpo])).catch(err=>postMessage({id:m.id,errore:String(err&&err.message||err)}));}
 };
