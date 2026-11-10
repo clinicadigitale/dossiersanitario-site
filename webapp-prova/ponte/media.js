@@ -146,7 +146,10 @@
   // ---------- invii in sospeso (anche il passaggio dei DICOM dell'exe al nuovo formato) ----------
   let riprovaInCorso=false;
   async function riprovaAttese(){
-    const c=cloud();if(riprovaInCorso||!c?.pronto?.()||c?.inRipristino?.())return;riprovaInCorso=true;
+    const c=cloud();if(riprovaInCorso||!c?.pronto?.()||c?.inRipristino?.())return;
+    // subito dopo l'accesso la chiave dell'archivio puo' non essere ancora pronta: si riprova al giro successivo
+    if(c.chiaveDisponibile&&!(await c.chiaveDisponibile()))return;
+    riprovaInCorso=true;
     let fatti=0,errori=0;
     try{
       const lista=await chiavi('attesa');const totale=lista.length;

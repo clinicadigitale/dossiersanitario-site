@@ -337,6 +337,7 @@ const DossierCloud = (() => {
   const mediaApi={
     pronto:()=>!!mediaCtx(),
     inPassaggio:()=>!!settings?.mediaMigrationPending,
+    async chiaveDisponibile(){const ctx=mediaCtx();if(!ctx)return false;try{await mediaKeyBytes(ctx);return true;}catch{return false;}},
     async passaggioTerminato(){if(!settings?.mediaMigrationPending)return false;await setManifestMediaFormat(settings);settings.mediaFormat=MEDIA_FORMAT;settings.mediaMigrationPending=false;settings.mediaSnapshotRequired=true;await DossierDB.put('cloudSettings',settings,{audit:false,sync:false});applySyncContext();return true;},
     inRipristino:()=>!!mediaContext,
     async carica(kind,pid,owner,rel,blob){const ctx=mediaCtx();if(!ctx)throw new Error('Archivio cloud non attivo');const key=await mediaKeyBytes(ctx);const r=await mediaRemote(ctx,key,kind,pid,owner,rel);const enc=await encryptBlob(blob,key,{kind:'media',mediaKind:kind});const remote=cloudPath(r.file,ctx.row);const d=await diretto(remote,'write',await enc.arrayBuffer());if(d){if(!d.ok)throw new Error(d.error||'Invio a MEGA non riuscito');return true;}await upload(remote,enc);return true;},
