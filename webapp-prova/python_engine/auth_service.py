@@ -381,7 +381,7 @@ class AuthService:
             "updatedAt": user.get("updatedAt", ""),
             "lastLoginAt": user.get("lastLoginAt", ""),
             "securityPreferences": {
-                "timeoutMinutes": max(1, min(60, int((user.get("securityPreferences") or {}).get("timeoutMinutes", 15) or 15))),
+                "timeoutMinutes": max(1, min(240, int((user.get("securityPreferences") or {}).get("timeoutMinutes", 15) or 15))),
                 "mfaRequiredForCloud": True,
             },
             "healthDataConsents": dict(user.get("healthDataConsents") or {}),
@@ -1174,7 +1174,7 @@ class AuthService:
                 timeout = int(raw.get("timeoutMinutes", 15) or 15)
             except (TypeError, ValueError):
                 timeout = 15
-            return {"timeoutMinutes": max(1, min(60, timeout)), "mfaRequiredForCloud": True}
+            return {"timeoutMinutes": max(1, min(240, timeout)), "mfaRequiredForCloud": True}
 
     def update_preferences(self, token: str, payload: dict[str, Any]) -> dict[str, Any]:
         current = self.require_session(token)
@@ -1182,8 +1182,8 @@ class AuthService:
             timeout = int(payload.get("timeoutMinutes", 15) or 15)
         except (TypeError, ValueError):
             raise AuthError("Tempo di blocco non valido", "invalid_timeout")
-        if timeout < 1 or timeout > 60:
-            raise AuthError("Il tempo di blocco deve essere compreso tra 1 e 60 minuti", "invalid_timeout")
+        if timeout < 1 or timeout > 240:
+            raise AuthError("Il tempo di blocco deve essere compreso tra 1 e 240 minuti", "invalid_timeout")
         with self.lock:
             data = self._load()
             user = self._find_id(data, current["id"])
