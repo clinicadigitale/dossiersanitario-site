@@ -180,10 +180,19 @@ const DossierDB = (() => {
     finally { syncBusy = false; }
   }
 
+  // Indici di DICOM e immagini: con i file nel cloud (formato files-v1) si sincronizzano come gli altri dati,
+  // tranne i ripristini (audit:false), le modifiche ricevute dal cloud e le voci con i file dentro il record.
+  function mediaIndexSync(store, value, options, ctx) {
+    if (!['dicomStudies','mediaAttachments'].includes(store) || !ctx.enabled || !ctx.mediaFiles) return false;
+    if (options.audit === false || String(options.details?.event || '').startsWith('cloud-')) return false;
+    if (value && (value.blob instanceof Blob || (Array.isArray(value.files) && value.files.some(f => f && f.blob instanceof Blob)))) return false;
+    return true;
+  }
+
   async function put(store, value, options={}) {
     value=ensurePrimaryKey(store,value);
     const syncContext = syncContextProvider?.() || {};
-    const shouldSync = options.sync !== false && syncContext.enabled && AUDITED.has(store) && !['cloudSettings','dicomStudies','mediaAttachments'].includes(store);
+    const shouldSync = mediaIndexSync(store, value, options, syncContext) || (options.sync !== false && syncContext.enabled && AUDITED.has(store) && !['cloudSettings','dicomStudies','mediaAttachments'].includes(store));
     let previous = null;
     if (shouldSync && value) previous = await get(store, value.id ?? value.key).catch(()=>null);
     if (shouldSync && value && typeof value === 'object') {
@@ -220,7 +229,7 @@ const DossierDB = (() => {
 
   async function del(store, key, options={}) {
     const syncContext = syncContextProvider?.() || {};
-    const shouldSync = options.sync !== false && syncContext.enabled && AUDITED.has(store) && !['cloudSettings','dicomStudies','mediaAttachments'].includes(store);
+    const shouldSync = mediaIndexSync(store, null, options, syncContext) || (options.sync !== false && syncContext.enabled && AUDITED.has(store) && !['cloudSettings','dicomStudies','mediaAttachments'].includes(store));
     const previous = options.previous || (AUDITED.has(store) ? await get(store, key).catch(()=>null) : null);
     const result = await tx(store, 'readwrite', s => s.delete(key));
     if (options.audit !== false) await addAudit('delete', store, key, previous?.profileId || options.profileId || '', options.details || {});

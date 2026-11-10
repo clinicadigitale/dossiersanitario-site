@@ -12,7 +12,7 @@
     if(worker)return worker;
     // Il motore parte da un piccolo avvio interno alla pagina: cosi' eredita sempre l'isolamento
     // della pagina (serve per usare piu' processori) senza dipendere dalle intestazioni del file.
-    const avvio=new Blob(["importScripts("+JSON.stringify(base+'engine-worker.js?v=web12')+");"],{type:'text/javascript'});
+    const avvio=new Blob(["importScripts("+JSON.stringify(base+'engine-worker.js?v=web13')+");"],{type:'text/javascript'});
     worker=new Worker(URL.createObjectURL(avvio));
     worker.onmessage=e=>{const m=e.data||{};
       if(m.tipo==='cloudProgresso'){try{window.dispatchEvent(new CustomEvent('dossier-cloud-progresso',{detail:m}));}catch(_){}return;}
@@ -50,6 +50,8 @@
     if(!isMotore(url))return fetchOriginale(input,init);
     let req;try{req=new Request(url,init);}catch(e){return Promise.reject(e);}
     if(input instanceof Request&&!init)req=input;
+    // DICOM e immagini: gestiti dall'archivio media della webapp (ponte/media.js)
+    try{if(window.DossierMediaWeb&&new URL(req.url).pathname.startsWith('/api/media/'))return window.DossierMediaWeb.gestisci(req,chiedi);}catch(_e){}
     if(isPdf(req))return caratteriPerPdf().then(()=>chiedi(req));
     return chiedi(req);
   };
