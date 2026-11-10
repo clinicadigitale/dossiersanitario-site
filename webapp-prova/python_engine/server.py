@@ -3588,6 +3588,10 @@ class ApiHandler(CommonHeadersMixin, BaseHTTPRequestHandler):
         if path == "/api/auth/mfa/start": self.handle_auth_mfa_start(); return
         if path == "/api/auth/mfa/confirm": self.handle_auth_mfa_confirm(); return
         if path == "/api/auth/mfa/disable": self.handle_auth_mfa_disable(); return
+        if path == "/api/auth/webauthn/login-start": self.handle_auth_webauthn("login-start"); return
+        if path == "/api/auth/webauthn/register-start": self.handle_auth_webauthn("register-start"); return
+        if path == "/api/auth/webauthn/register-finish": self.handle_auth_webauthn("register-finish"); return
+        if path == "/api/auth/webauthn/remove": self.handle_auth_webauthn("remove"); return
         if path == "/api/auth/developer-mfa": self.handle_auth_developer_mfa(); return
         if path == "/api/security/device-secret/protect": self.handle_device_secret_protect(); return
         if path == "/api/security/device-secret/unprotect": self.handle_device_secret_unprotect(); return
@@ -4276,7 +4280,8 @@ class ApiHandler(CommonHeadersMixin, BaseHTTPRequestHandler):
     def handle_auth_login(self):
         try:
             data = self.read_json(max_size=64 * 1024)
-            result = AUTH.login(data.get("username", ""), data.get("password", ""), data.get("otp", ""), require_mfa=_device_cloud_linked())
+            webauthn = data.get("webauthn") if isinstance(data.get("webauthn"), dict) else None
+            result = AUTH.login(data.get("username", ""), data.get("password", ""), data.get("otp", ""), require_mfa=_device_cloud_linked(), webauthn=webauthn)
             result = _enforce_account_plan(result)
             self.send_json(200, {"ok": True, **result})
         except AuthError as exc:
@@ -4518,6 +4523,23 @@ class ApiHandler(CommonHeadersMixin, BaseHTTPRequestHandler):
             self.send_json(exc.status, {"ok": False, "error": str(exc), "code": exc.code})
         except Exception as exc:
             traceback.print_exc(); self.send_json(500, {"ok": False, "error": str(exc), "code": "developer_mfa_internal"})
+
+    def handle_auth_webauthn(self, action: str):
+        try:
+            data = self.read_json(max_size=64 * 1024)
+            if action == "login-start":
+                result = AUTH.webauthn_login_start(data.get("username", ""))
+            elif action == "register-start":
+                result = AUTH.webauthn_register_start(self.auth_token(), data.get("otp", ""), data.get("rpId", ""))
+            elif action == "register-finish":
+                result = AUTH.webauthn_register_finish(self.auth_token(), data)
+            else:
+                result = AUTH.webauthn_remove(self.auth_token(), data.get("credentialId", ""))
+            self.send_json(200, {"ok": True, **result})
+        except AuthError as exc:
+            self.send_json(exc.status, {"ok": False, "error": str(exc), "code": exc.code})
+        except Exception as exc:
+            traceback.print_exc(); self.send_json(500, {"ok": False, "error": str(exc), "code": "auth_internal"})
 
     def handle_auth_mfa_disable(self):
         try:

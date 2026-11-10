@@ -91,6 +91,49 @@ def _verify_totp(secret: str, token: str) -> bool:
     return any(hmac.compare_digest(_totp(secret, now + offset), clean) for offset in (-60, -30, 0, 30, 60))
 
 
+# Impronta (WebAuthn): sostituisce il codice a 6 cifre sul dispositivo dove e' stata attivata.
+WEBAUTHN_CHALLENGE_SECONDS = 180
+
+
+def _b64url_decode(value: str) -> bytes:
+    text = str(value or "").strip()
+    return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+
+
+def _b64url_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _webauthn_client_data(client_data_b64: str, expected_type: str, expected_challenge: str) -> bytes:
+    raw = _b64url_decode(client_data_b64)
+    try:
+        client = json.loads(raw.decode("utf-8"))
+    except Exception as exc:
+        raise AuthError("Risposta dell'impronta non leggibile", "webauthn_invalid", 400) from exc
+    if client.get("type") != expected_type:
+        raise AuthError("Risposta dell'impronta non valida", "webauthn_invalid", 400)
+    if not expected_challenge or not hmac.compare_digest(str(client.get("challenge") or ""), expected_challenge):
+        raise AuthError("Richiesta dell'impronta scaduta: riprova", "webauthn_expired", 400)
+    return raw
+
+
+def _webauthn_verify_signature(public_key_b64: str, alg: int, signed: bytes, signature: bytes) -> bool:
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec, padding
+    from cryptography.exceptions import InvalidSignature
+    key = serialization.load_der_public_key(_b64url_decode(public_key_b64))
+    try:
+        if int(alg) == -7:
+            key.verify(signature, signed, ec.ECDSA(hashes.SHA256()))
+        elif int(alg) == -257:
+            key.verify(signature, signed, padding.PKCS1v15(), hashes.SHA256())
+        else:
+            return False
+        return True
+    except InvalidSignature:
+        return False
+
+
 MFA_SECRET_ITERATIONS = 260_000
 MFA_SECRET_PREFIX = "pwv1:"
 
@@ -960,7 +1003,7 @@ class AuthService:
             self._audit("family-membership-applied", user["id"], {"profileId": user["linkedProfileId"]})
             return self._public_user(user)
 
-    def login(self, username: str, password: str, otp: str = "", require_mfa: bool = True) -> dict[str, Any]:
+    def login(self, username: str, password: str, otp: str = "", require_mfa: bool = True, webauthn: dict[str, Any] | None = None) -> dict[str, Any]:
         with self.lock:
             data = self._load()
             user = self._find(data, username)
@@ -1017,6 +1060,15 @@ class AuthService:
                         user.pop("mfaSecretProtected", None)
                         data["version"] = max(3, int(data.get("version", 2) or 2))
                         self._audit("mfa-secret-migrated", user["id"], {"mode": "password-portable"})
+                elif webauthn and self._webauthn_assertion_ok(user, webauthn):
+                    verified = True
+                    try:
+                        envelope = str(user.get("mfaSecretEnvelope", "") or "")
+                        if envelope:
+                            session_mfa_secret = _portable_mfa_unprotect(envelope, password)
+                    except Exception:
+                        session_mfa_secret = ""
+                    self._audit("login-webauthn", user["id"])
                 elif clean_recovery:
                     digest = _hash_recovery(clean_recovery)
                     hashes = list(user.get("recoveryCodeHashes") or [])
@@ -1049,6 +1101,120 @@ class AuthService:
             )
             self._audit("login", user["id"])
             return {"token": token, "user": self._public_user(user), "clientSalt": user["clientSalt"]}
+
+    # ---- Impronta (WebAuthn) ----
+    def _webauthn_pending(self) -> dict[str, Any]:
+        pending = getattr(self, "_webauthn_challenges", None)
+        if pending is None:
+            pending = {}
+            self._webauthn_challenges = pending
+        now = time.time()
+        for key in [k for k, v in pending.items() if now - float(v.get("created") or 0) > WEBAUTHN_CHALLENGE_SECONDS]:
+            pending.pop(key, None)
+        return pending
+
+    def _webauthn_assertion_ok(self, user: dict[str, Any], payload: dict[str, Any]) -> bool:
+        credential_id = str(payload.get("credentialId") or "")
+        stored = next((c for c in (user.get("webauthnCredentials") or []) if c.get("id") == credential_id), None)
+        if not stored:
+            raise AuthError("Impronta non registrata per questo account: usa il codice a 6 cifre", "webauthn_unknown", 401)
+        pending = self._webauthn_pending().pop("login:" + str(user.get("id")), None)
+        client_raw = _webauthn_client_data(payload.get("clientDataJSON", ""), "webauthn.get", str((pending or {}).get("challenge") or ""))
+        auth_data = _b64url_decode(payload.get("authenticatorData", ""))
+        if len(auth_data) < 37 or auth_data[:32] != hashlib.sha256(str(stored.get("rpId") or "").encode("utf-8")).digest():
+            raise AuthError("Impronta registrata su un altro indirizzo: usa il codice a 6 cifre", "webauthn_invalid", 401)
+        flags = auth_data[32]
+        if not (flags & 0x01) or not (flags & 0x04):
+            raise AuthError("Impronta non verificata", "webauthn_invalid", 401)
+        signed = auth_data + hashlib.sha256(client_raw).digest()
+        if not _webauthn_verify_signature(stored.get("publicKey", ""), int(stored.get("alg") or -7), signed, _b64url_decode(payload.get("signature", ""))):
+            raise AuthError("Impronta non valida", "webauthn_invalid", 401)
+        counter = int.from_bytes(auth_data[33:37], "big")
+        previous = int(stored.get("signCount") or 0)
+        if counter and previous and counter <= previous:
+            raise AuthError("Impronta non valida (contatore)", "webauthn_invalid", 401)
+        stored["signCount"] = counter
+        stored["lastUsedAt"] = utc_now()
+        return True
+
+    def webauthn_login_start(self, username: str) -> dict[str, Any]:
+        with self.lock:
+            data = self._load()
+            user = self._find(data, username)
+            credentials = [c for c in ((user or {}).get("webauthnCredentials") or []) if c.get("id")]
+            if not user or user.get("active") is False or not user.get("mfaEnabled") or not credentials:
+                raise AuthError("Impronta non attiva per questo account", "webauthn_unavailable", 404)
+            challenge = _b64url_encode(secrets.token_bytes(32))
+            self._webauthn_pending()["login:" + str(user["id"])] = {"challenge": challenge, "created": time.time()}
+            return {"challenge": challenge, "credentialIds": [c["id"] for c in credentials], "timeout": WEBAUTHN_CHALLENGE_SECONDS * 1000}
+
+    def webauthn_register_start(self, token: str, otp: str, rp_id: str) -> dict[str, Any]:
+        user = self.require_session(token)
+        if not user.get("mfaEnabled"):
+            raise AuthError("Attiva prima il codice temporaneo personale", "mfa_not_enabled", 409)
+        with self.lock:
+            row = self.sessions.get(str(token or "")) or {}
+            secret = str(row.get("mfaSecret") or "")
+            if not secret:
+                raise AuthError("Per attivare l'impronta esci con Logout e rientra usando il codice a 6 cifre", "webauthn_session_unavailable", 409)
+            if not _verify_totp(secret, otp):
+                raise AuthError("Il codice temporaneo non è valido", "invalid_otp", 401)
+            rp = str(rp_id or "").strip().lower()
+            if not re.fullmatch(r"[a-z0-9.-]{1,253}", rp):
+                raise AuthError("Indirizzo del Dossier non valido", "webauthn_invalid", 400)
+            challenge = _b64url_encode(secrets.token_bytes(32))
+            self._webauthn_pending()["register:" + str(user["id"])] = {"challenge": challenge, "created": time.time(), "rpId": rp}
+            return {
+                "challenge": challenge,
+                "rpId": rp,
+                "userId": _b64url_encode(hashlib.sha256(str(user["id"]).encode("utf-8")).digest()),
+                "userName": str(user.get("username") or user.get("email") or "utente"),
+                "displayName": str(user.get("displayName") or user.get("username") or "Utente"),
+                "excludeIds": [c["id"] for c in (user.get("webauthnCredentials") or []) if c.get("id")],
+                "timeout": WEBAUTHN_CHALLENGE_SECONDS * 1000,
+            }
+
+    def webauthn_register_finish(self, token: str, payload: dict[str, Any]) -> dict[str, Any]:
+        user = self.require_session(token)
+        with self.lock:
+            pending = self._webauthn_pending().pop("register:" + str(user["id"]), None)
+            if not pending:
+                raise AuthError("Richiesta dell'impronta scaduta: riprova", "webauthn_expired", 400)
+            _webauthn_client_data(payload.get("clientDataJSON", ""), "webauthn.create", str(pending.get("challenge") or ""))
+            credential_id = str(payload.get("credentialId") or "")
+            public_key = str(payload.get("publicKey") or "")
+            alg = int(payload.get("alg") or 0)
+            if not credential_id or not public_key or alg not in (-7, -257):
+                raise AuthError("Questo dispositivo non fornisce un'impronta compatibile", "webauthn_unsupported", 400)
+            from cryptography.hazmat.primitives import serialization
+            try:
+                serialization.load_der_public_key(_b64url_decode(public_key))
+            except Exception as exc:
+                raise AuthError("Chiave dell'impronta non valida", "webauthn_invalid", 400) from exc
+            data = self._load()
+            stored = self._find_id(data, user["id"])
+            items = [c for c in (stored.get("webauthnCredentials") or []) if c.get("id") != credential_id]
+            items.append({
+                "id": credential_id, "publicKey": public_key, "alg": alg, "rpId": pending["rpId"], "signCount": 0,
+                "label": str(payload.get("label") or "Dispositivo")[:80], "createdAt": utc_now(),
+            })
+            stored["webauthnCredentials"] = items[-10:]
+            stored["updatedAt"] = utc_now()
+            self._save(data)
+            self._audit("webauthn-registered", user["id"], {"label": str(payload.get("label") or "")[:80]})
+            return {"credentialId": credential_id}
+
+    def webauthn_remove(self, token: str, credential_id: str) -> dict[str, Any]:
+        user = self.require_session(token)
+        with self.lock:
+            data = self._load()
+            stored = self._find_id(data, user["id"])
+            before = list(stored.get("webauthnCredentials") or [])
+            stored["webauthnCredentials"] = [c for c in before if c.get("id") != str(credential_id or "")]
+            stored["updatedAt"] = utc_now()
+            self._save(data)
+            self._audit("webauthn-removed", user["id"])
+            return {"removed": len(before) - len(stored["webauthnCredentials"])}
 
     def logout(self, token: str) -> None:
         with self.lock:
@@ -1848,6 +2014,7 @@ class AuthService:
             stored = self._find_id(data, user["id"])
             codes = _recovery_codes()
             stored["mfaEnabled"] = False
+            stored.pop("webauthnCredentials", None)
             stored.pop("mfaSecretProtected", None)
             stored.pop("mfaSecretEnvelope", None)
             stored["recoveryCodeHashes"] = [_hash_recovery(c) for c in codes]
