@@ -6179,7 +6179,9 @@ const App = (() => {
     await addBackupEntry(zip,entries,'sincronizzazione/impostazioni_cloud.json',backupJson(values.cloudSettings.map(({credentials,...row})=>row)),{kind:'cloud'});
     await addBackupEntry(zip,entries,'sincronizzazione/coda.json',backupJson(values.syncQueue),{kind:'sync'});
     const perProfile=[];
+    const avanza=typeof options.onProgress==='function'?options.onProgress:null;let profiliFatti=0;
     for(const p of allProfiles){
+      avanza?.(.6*profiliFatti/Math.max(1,allProfiles.length),`Profilo ${profiliFatti+1} di ${allProfiles.length}`);profiliFatti++;
       const base=`profili/${profileFolderName(p)}/`,folder=zip.folder(base);void folder;
       const {healthCardFrontBlob,healthCardBackBlob,avatarBlob,...profileMeta}=p;
       await addBackupEntry(zip,entries,base+'profilo.json',backupJson(profileMeta),{kind:'profile',profileId:p.id});
@@ -6205,7 +6207,7 @@ const App = (() => {
     zip.file('manifest.json',backupJson(manifest));
     const estimatedBytes=allDocs.reduce((sum,d)=>sum+Number(d.fileBlob?.size||d.size||0),0)+allTrash.reduce((sum,x)=>sum+Number(x.payload?.document?.fileBlob?.size||0),0)+(includeMediaArchive?values.dicomStudies.reduce((sum,x)=>sum+Number(x.totalBytes||0),0)+values.mediaAttachments.reduce((sum,x)=>sum+Number(x.size||0),0):0);
     if(!await ensureStorageFor(Math.max(estimatedBytes,10*1024*1024),'la preparazione del backup'))throw new Error('Spazio insufficiente per preparare il backup');
-    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}},m=>avanza?.(.6+.4*(Number(m?.percent)||0)/100,`Compressione ${Math.round(Number(m?.percent)||0)}%`));
     const verification=await verifyBackupBlob(blob);state.lastBackupReport=verification.report;if(!verification.ok)throw new Error(verification.report.message);
     return blob;
     }finally{DossierSecurity.endTechnicalActivity?.('backup-build');}
@@ -6582,7 +6584,7 @@ const App = (() => {
     const notify=(percent,phase,detail='')=>{try{options.onProgress?.({percent,phase,detail});}catch{}};
     notify(1,'Verifica preventiva','Controllo completo del backup prima di modificare l’archivio locale.');await preflightRestorePlan(plan);notify(3,'Preparazione','Salvataggio dello stato corrente per la verifica.');const snapshot=await captureDatabaseSnapshot();let safetyBlob=null;
     try{
-      if(!options.skipSafetyBackup){notify(4,'Backup di sicurezza','Preparazione della copia locale precedente al ripristino.');safetyBlob=await buildBackupBlob();if(!options.skipSafetyDownload)downloadBlob(safetyBlob,safetyBackupName(plan.mode));}
+      if(!options.skipSafetyBackup){notify(4,'Backup di sicurezza','Preparazione della copia locale precedente al ripristino.');safetyBlob=await buildBackupBlob({onProgress:(f,t)=>notify(4+Math.max(0,Math.min(1,f))*4,'Backup di sicurezza',`Copia dei dati attuali prima del ripristino · ${t}`)});if(!options.skipSafetyDownload)downloadBlob(safetyBlob,safetyBackupName(plan.mode));}
       notify(8,'Preparazione database','Apertura delle sezioni da ripristinare.');if(plan.mode==='full')for(const store of plan.affectedStores)await DossierDB.clear(store);
       const order=['profiles','documents','doctors','therapies','diagnoses','exemptions','measurements','weightJourneys','documentVersions','calendarEvents','calendarSuggestions','vaccinations','interventions','symptoms','therapyAdherence','carePlans','dicomStudies','mediaAttachments','trash','settings','users','devices','auditLog','cloudSettings','syncQueue'];
       const totalRows=Math.max(1,order.reduce((n,store)=>n+(plan.operations[store]||[]).length,0));let appliedRows=0;
