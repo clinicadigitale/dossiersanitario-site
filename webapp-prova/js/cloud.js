@@ -104,7 +104,9 @@ const DossierCloud = (() => {
     const overlay=document.createElement('div');overlay.id='cloudRecoveryMainProgress';overlay.className='cloud-main-progress-overlay';
     overlay.innerHTML=`<div class="cloud-main-progress-card"><div class="cloud-main-progress-head"><img src="assets/icon-64.png" alt=""><div><strong>Collegamento e ripristino cloud</strong><span data-recovery-phase>Preparazione…</span></div><b data-recovery-percent>0%</b></div><div class="cloud-main-progress-track"><span data-recovery-bar style="width:0%"></span></div><p data-recovery-detail>Avvio del collegamento.</p></div>`;
     document.body.appendChild(overlay);
-    const update=(pct,phase,detail='')=>{const v=Math.max(0,Math.min(100,Math.round(Number(pct)||0)));const percent=overlay.querySelector('[data-recovery-percent]'),bar=overlay.querySelector('[data-recovery-bar]'),stage=overlay.querySelector('[data-recovery-phase]'),info=overlay.querySelector('[data-recovery-detail]');if(percent)percent.textContent=`${v}%`;if(bar)bar.style.width=`${v}%`;if(stage)stage.textContent=phase||'Ripristino';if(info)info.textContent=detail||'';setCloudProgress(v,phase,detail);};
+    let massimoVisto=0;
+    // la barra non torna mai indietro (tranne l'azzeramento esplicito in caso di errore)
+    const update=(pct,phase,detail='')=>{const v0=Math.max(0,Math.min(100,Math.round(Number(pct)||0)));const v=Number(pct)===0?0:Math.max(massimoVisto,v0);massimoVisto=v;const percent=overlay.querySelector('[data-recovery-percent]'),bar=overlay.querySelector('[data-recovery-bar]'),stage=overlay.querySelector('[data-recovery-phase]'),info=overlay.querySelector('[data-recovery-detail]');if(percent)percent.textContent=`${v}%`;if(bar)bar.style.width=`${v}%`;if(stage)stage.textContent=phase||'Ripristino';if(info)info.textContent=detail||'';setCloudProgress(v,phase,detail);};
     return {update,close:()=>overlay.remove()};
   }
   function readSyncLease(){try{return JSON.parse(localStorage.getItem(SYNC_LEASE_KEY)||'null');}catch{return null;}}
@@ -136,7 +138,9 @@ const DossierCloud = (() => {
     for(;;){await new Promise(r=>setTimeout(r,450));const st=await get(`/upload-progress?id=${encodeURIComponent(jobId)}`);const total=Math.max(0,Number(st.totalBytes)||Number(blob.size)||0),done=Math.max(0,Number(st.bytes)||0);if(st.status==='error')throw new Error(st.error||'Trasferimento cloud non completato.');const pct=Number.isFinite(Number(st.percent))?Math.max(0,Math.min(100,Math.round(Number(st.percent)))):(total>0?Math.max(0,Math.min(100,Math.round(done/total*100))):null);if(st.status==='queued'||st.stage==='prepare')onProgress?.(null,'Preparazione invio','Preparazione del collegamento e dello spazio di destinazione.');else if(st.stage==='verify')onProgress?.(null,'Verifica copia cifrata',total>0?`${formatTransferBytes(total)} trasferiti · verifica integrità e dimensione`:'Verifica del trasferimento.');else if(st.stage==='commit')onProgress?.(null,'Conferma archivio cloud','Rendendo definitiva la copia verificata.');else onProgress?.(pct,'Invio copia cifrata',total>0?`${formatTransferBytes(done)} / ${formatTransferBytes(total)}${pct!==null?` · ${pct}%`:''}`:'Trasferimento al servizio cloud in corso.');if(st.status==='done')return st;}
   }
   const download=(remote)=>request(`/download?remote=${encodeURIComponent(remote)}`);
-  async function downloadStream(remote,onProgress){
+  async function downloadStream(remote,onProgressRaw){
+    // un solo avanzamento che non torna mai indietro: scaricamento da MEGA fino all'85%, passaggio interno fino al 100%
+    let massimo=0;const onProgress=(bytes,total,pct,fase)=>{const t=Math.max(0,Number(total)||0);if(!t){onProgressRaw?.(bytes,total,pct);return;}const quota=fase==='locale'?.85+.15*Math.min(1,bytes/t):.85*Math.min(1,bytes/t);const v=Math.max(massimo,quota);massimo=v;onProgressRaw?.(Math.round(v*t),t,Math.round(v*100));};
     const ascolta=e=>{const d=e.detail||{};const tot=Math.max(0,Number(d.totale)||0),car=Math.max(0,Number(d.caricati)||0);if(tot>0)onProgress?.(car,tot,Math.min(100,Math.round(car/tot*100)));};
     window.addEventListener('dossier-cloud-progresso',ascolta);
     let start;try{start=await postJson('/download-start',{remote});}finally{window.removeEventListener('dossier-cloud-progresso',ascolta);}
@@ -165,7 +169,7 @@ const DossierCloud = (() => {
           }catch(error){lastError=error;if(attempt<4)await new Promise(r=>setTimeout(r,300*(attempt+1)));}
         }
         if(!part)throw lastError||new Error('Trasferimento locale del blocco non riuscito.');
-        parts.push(part);received+=part.size;onProgress?.(received,total,total?Math.round(received/total*100):null);
+        parts.push(part);received+=part.size;onProgress(received,total,null,'locale');
       }
       if(received!==total)throw new Error(`Download locale incompleto: attesi ${total} byte, ricevuti ${received}`);
       const blob=new Blob(parts,{type:'application/octet-stream'});
