@@ -327,6 +327,10 @@ const DossierCloud = (() => {
   }
 
   async function createManifest(row){const manifest={app:'Dossier Sanitario Locale',format:'DSL5-CLOUD',archiveId:row.archiveId,displayName:row.displayName,provider:row.provider,basePath:cleanBasePath(row.basePath),createdAt:row.createdAt,version:'5.0.0',mediaFormat:MEDIA_FORMAT};row.mediaFormat=MEDIA_FORMAT;await upload(cloudPath('archive.json',row),new Blob([JSON.stringify(manifest)],{type:'application/json'}));}
+  // Elenco dei pacchetti di modifiche gia' contenuti in una copia completa: un dispositivo nuovo
+  // non li riscarica. Le copie fatte dall'exe non hanno l'elenco: in quel caso si scarica tutto lo storico.
+  async function snapshotIncluded(row,keyBytes,snapName){try{const leaf=String(snapName||'').split('/').pop();const b=await download(cloudPath(`snapshots/${leaf}.included`,row));const out=await decryptBlob(b,keyBytes);const j=JSON.parse(await out.blob.text());return Array.isArray(j.batches)?j.batches.map(String):[];}catch{return [];}}
+  async function includedBatchIds(row){const items=await listRemoteChangeItems(row,{excludeOwn:false});const processed=new Set(row.processedEventIds||[]);const ownPrefix=`${safePart(deviceId())}/`;const ids=[];for(const it of items){const rn=String(it.Path||it.Name||'').replace(/^\/+/,'');const id=rn.split('/').pop().replace(/\.(dslb|dslc)$/,'');if(processed.has(id)||rn.startsWith(ownPrefix)||rn.includes('/'+ownPrefix))ids.push(id);}return ids;}
   async function setManifestMediaFormat(row){const blob=await download(cloudPath('archive.json',row));const manifest=JSON.parse(await blob.text());if(manifest.format!=='DSL5-CLOUD'||manifest.archiveId!==row.archiveId)throw new Error('Manifesto archivio non valido');if(manifest.mediaFormat===MEDIA_FORMAT)return;manifest.mediaFormat=MEDIA_FORMAT;manifest.mediaFormatSince=new Date().toISOString();await upload(cloudPath('archive.json',row),new Blob([JSON.stringify(manifest)],{type:'application/json'}));}
   function mediaCtx(){if(mediaContext)return mediaContext;if(settings?.enabled&&(settings.mediaFormat===MEDIA_FORMAT||settings.mediaMigrationPending)&&settings.archiveId&&settings.remoteName)return{row:settings,key:null};return null;}
   // Canale diretto verso MEGA (in parallelo, fuori dalla coda del motore); se non e' pronto si usa la via normale.
@@ -362,6 +366,7 @@ const DossierCloud = (() => {
       const leaf=String(item.Path||item.Name||'').replace(/\\/g,'/').split('/').pop();
       if(!leaf)continue;
       await deleteRemote(cloudPath(`snapshots/${leaf}`,row));
+      await deleteRemote(cloudPath(`snapshots/${leaf}.included`,row)).catch(()=>{});
       if(commitNames.has(`${leaf}.commit`))await deleteRemote(cloudPath(`snapshots/${leaf}.commit`,row));
     }
   }
@@ -378,10 +383,12 @@ const DossierCloud = (() => {
     let existing={exists:false},committed={exists:false};
     if(retrying){[existing,committed]=await Promise.all([remoteStat(finalRemote),remoteStat(commitRemote)]);}
     onProgress?.(null,'Consolidamento archivio','Creazione e verifica della copia protetta.');
+    let inclusi=null;try{inclusi=await includedBatchIds(row);}catch(error){console.warn('Elenco dei pacchetti inclusi non disponibile:',error);}
     const backup=await App.buildBackupBlob({includeMediaArchive});onProgress?.(null,'Cifratura consolidamento',includeMediaArchive?'Protezione della copia, comprese immagini e DICOM locali.':'Protezione della copia prima del trasferimento.');const encrypted=await encryptBlob(backup,keyBytes,{kind:'snapshot',archiveId:row.archiveId,deviceId:deviceId()});
     if(existing?.exists&&Number(existing.item?.Size??-1)!==encrypted.size){name=snapshotName();row.pendingSnapshotName=name;await DossierDB.put('cloudSettings',row,{audit:false,sync:false});finalRemote=cloudPath(`snapshots/${name}`,row);commitRemote=cloudPath(`snapshots/${name}.commit`,row);existing={exists:false};committed={exists:false};}
     if(!existing?.exists){await assertCloudSpace(row,encrypted.size,onProgress);await uploadWithRealProgress(finalRemote,encrypted,onProgress);}
     if(!committed?.exists){const marker=new Blob([JSON.stringify({format:'DSL5-COMMIT',kind:'snapshot',name,size:encrypted.size,at:new Date().toISOString()})],{type:'application/json'});await uploadWithRealProgress(commitRemote,marker,(pct)=>onProgress?.(pct===100?100:null,'Conferma consolidamento','Registrazione del commit della copia.'));}
+    if(inclusi){try{const enc=await encryptBlob(new Blob([JSON.stringify({format:'DSL5-INCLUDED',snapshot:name,at:new Date().toISOString(),batches:inclusi})],{type:'application/json'}),keyBytes,{kind:'snapshot-included',archiveId:row.archiveId});await upload(cloudPath(`snapshots/${name}.included`,row),enc);}catch(error){console.warn('Elenco dei pacchetti inclusi non salvato:',error);}}
     row.lastSnapshotAt=new Date().toISOString();row.lastSnapshotName=name;if(includeMediaArchive){row.lastMediaSnapshotFingerprint=mediaFingerprint;row.lastMediaSnapshotAt=row.lastSnapshotAt;row.mediaSnapshotRequired=false;}if(row.mediaFormat===MEDIA_FORMAT)row.mediaSnapshotRequired=false;delete row.pendingSnapshotName;delete row.pendingSnapshotStartedAt;await DossierDB.put('cloudSettings',row,{audit:false,sync:false});setTimeout(()=>void pruneOldSnapshots(row,MAX_SNAPSHOTS).catch(error=>console.warn('Rotazione snapshot rinviata:',error)),3000);onProgress?.(100,'Verifica finale',includeMediaArchive?'Archivio consolidato con DICOM e immagini confermato.':'Archivio consolidato e confermato.');return name;}
 
   async function createArchive(form){
@@ -427,7 +434,8 @@ const DossierCloud = (() => {
       const progress=(pct,phase,detail)=>{const rawPct=Math.max(0,Math.min(100,Number(pct)||0));const overall=81+rawPct*.13;updateStatusText(`${phase}${detail?` · ${detail}`:''}`);setCloudProgress(overall,phase,detail);recoveryUi.update(overall,phase,detail);};
       recoveryUi.update(81,'Aggiornamenti successivi','Preparazione dei pacchetti successivi alla copia completa.');
       // Riproduce tutti i pacchetti confermati, di tutti i dispositivi, fino all'ultimo disponibile.
-      const received=await downloadChanges(row,raw,progress,{includeOwn:true,afterMs:0,strict:true});
+      const inclusi=await snapshotIncluded(row,raw,snapName);
+      const received=await downloadChanges(row,raw,progress,{includeOwn:true,afterMs:0,strict:true,alreadyIncluded:inclusi});
       if(received.deferred)throw new Error(`Recupero cloud incompleto: ${received.deferred} pacchetti non sono stati scaricati.`);
       if(manifestMediaFormat!==MEDIA_FORMAT)row.mediaMigrationPending=true;else row.mediaFormat=MEDIA_FORMAT;mediaContext=null;
       recoveryUi.update(95,'Verifica finale','Controllo del Dossier ricostruito e preparazione dell’accesso.');
@@ -685,10 +693,10 @@ const DossierCloud = (() => {
     return reconciled;
   }
 
-  async function downloadChanges(row,keyBytes,onProgress,{includeOwn=false,afterMs=0,beforeMs=0,strict=false,markAfterCutoffProcessed=false,requiredBatchId=''}={}){
+  async function downloadChanges(row,keyBytes,onProgress,{includeOwn=false,afterMs=0,beforeMs=0,strict=false,markAfterCutoffProcessed=false,requiredBatchId='',alreadyIncluded=[]}={}){
     onProgress?.(0,'Confronto archivio','Lettura delle modifiche disponibili sul cloud.');
     let items=await listRemoteChangeItems(row,{excludeOwn:!includeOwn});
-    const processed=new Set(row.processedEventIds||[]),quarantined=[];
+    const processed=new Set([...(row.processedEventIds||[]),...(alreadyIncluded||[])]),quarantined=[];
     const itemId=item=>String(item.Path||item.Name||'').split('/').pop().replace(/\.(dslb|dslc)$/,'');
     const itemMs=item=>archiveTimestampFromName(itemId(item),'batch23_');
     if(afterMs>0)items=items.filter(item=>{const ms=itemMs(item);return !ms||ms>afterMs;});
@@ -979,6 +987,7 @@ Conservare separatamente dal computer e dal cloud. Chi possiede questa chiave pu
     if(!restored)throw new Error('Ripristino del Dossier familiare non completato.');
     if(manifestMediaFormat!==MEDIA_FORMAT)row.mediaMigrationPending=true;else row.mediaFormat=MEDIA_FORMAT;}finally{mediaContext=null;}
     onProgress?.(82,'Configurazione sincronizzazione','Associazione permanente di questo dispositivo.');
+    {const inclusi=await snapshotIncluded(row,raw,String(snap.Path||snap.Name||''));if(inclusi.length)row.processedEventIds=[...new Set([...(row.processedEventIds||[]),...inclusi])].slice(-MAX_PROCESSED);}
     await DossierDB.clear('syncQueue');row.enabled=true;row.lastSnapshotAt=new Date().toISOString();row.lastSnapshotName=String(snap.Path||snap.Name||'').split('/').pop();
     await DossierDB.put('cloudSettings',row,{audit:false,sync:false});settings=row;applySyncContext();await DossierSecurity.registerCurrentDevice({sync:true});
     localStorage.setItem('dossierCloudProvider',row.provider);
