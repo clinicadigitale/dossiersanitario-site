@@ -956,10 +956,12 @@ const App = (() => {
     $('#exportPdfBtn').addEventListener('click',()=>{if(!DossierSecurity.canUse('exportPdf'))return toast('Esportazione PDF non autorizzata');exportPdf();});
     $('#lockNowBtn')?.addEventListener('click',()=>{if(confirm('Vuoi effettuare il logout?'))DossierSecurity.lock('Logout');});
     $('#globalSearchBtn')?.addEventListener('click',()=>{state.activeView='search-dossier';selectNav('search-dossier');render();});
-    const openProfilePage=()=>{if(!activeProfile())return toast('Seleziona prima un profilo');state.activeView='profile';selectNav('profile');render();if(window.innerWidth<=820)$('#sidebar').classList.remove('open');};
+    const closeMobileSidebar=()=>{let telefono=false;try{telefono=!!window.FotoDocumento?.isTelefono?.();}catch{}if(window.innerWidth<=820||telefono)$('#sidebar').classList.remove('open');};
+    const openProfilePage=()=>{if(!activeProfile())return toast('Seleziona prima un profilo');state.activeView='profile';selectNav('profile');render();closeMobileSidebar();};
     $('#profileDataPageBtn')?.addEventListener('click',openProfilePage);
     $('#profileDataAvatarBtn')?.addEventListener('click',openProfilePage);
-    $('#sidebarColorShortcut')?.addEventListener('click',()=>{state.activeView='preferences';selectNav('preferences');render();});
+    $('#sidebarColorShortcut')?.addEventListener('click',()=>{state.activeView='preferences';selectNav('preferences');render();closeMobileSidebar();});
+    $('#addProfileBtn')?.addEventListener('click',closeMobileSidebar);
     bindDeveloperModeTrigger();
     updateDeveloperModeBadge();
     window.addEventListener('dossier-security-changed',()=>{if(state.activeView==='preferences')renderPreferences();void syncAuthorizedCalendarToGoogle({silent:true,force:true}).catch(()=>{});});
@@ -971,14 +973,14 @@ const App = (() => {
       state.activeProfileId = e.target.value || null;
       state.graphParameterId='';state.graphUnitKey='';state.graphSelectedRowKey='';
       const activeKey=`activeProfileId:${DossierSecurity.currentUser()?.id||'anonymous'}`;await DossierDB.put('settings', {key:activeKey, value:state.activeProfileId});
-      await loadProfileData({deferCalendarMaintenance:true}); await loadPreferences(); render();
+      await loadProfileData({deferCalendarMaintenance:true}); await loadPreferences(); render();closeMobileSidebar();
       void runDeferredProfileCalendarMaintenance(state.activeProfileId);
     });
     $$('.nav-item').forEach(btn => btn.addEventListener('click', () => {
       state.activeView = btn.dataset.view;
       syncNavigation();
       render();
-      if (window.innerWidth <= 820) $('#sidebar').classList.remove('open');
+      closeMobileSidebar();
     }));
     $('#menuBtn').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
     $('#closeModalBtn').addEventListener('click', closeModal);

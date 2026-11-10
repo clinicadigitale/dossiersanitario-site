@@ -87,13 +87,34 @@
     const w=window.open(url,'dossier_google','width=520,height=680');
     if(!w){mostraStato('Il browser ha bloccato la finestra di Google. ',true,true);if(box){const a=document.createElement('a');a.href=url;a.target='dossier_google';a.textContent='Apri Google';a.style.cssText='color:#fff;text-decoration:underline;margin-left:6px';a.onclick=()=>setTimeout(()=>{box&&box.remove();box=null;},500);box.appendChild(a);}}
   }
+  // Sul telefono la scheda del Dossier resta sospesa mentre si e' nella scheda di Google:
+  // la pagina di ritorno lascia la risposta anche nella memoria del sito e il Dossier la
+  // completa appena si torna nella sua scheda.
+  const CHIAVE_RITORNO='dossierGoogleRitorno',ritorniGestiti=new Set();let canaleGoogle=null;
+  async function completaGoogle(q,daMemoria){
+    if(!q||ritorniGestiti.has(q))return;ritorniGestiti.add(q);
+    try{const v=JSON.parse(localStorage.getItem(CHIAVE_RITORNO)||'null');if(v&&v.q===q)localStorage.removeItem(CHIAVE_RITORNO);}catch(_e){}
+    if(daMemoria)mostraStato('Completamento del collegamento a Google Calendar…');
+    for(let i=0;i<240&&!pronto;i++)await new Promise(r=>setTimeout(r,500));
+    let ok=false,testo='';
+    try{const r=await window.fetch('http://127.0.0.1:'+PORTA+'/?'+q);ok=r.ok;testo=(await r.text()).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();}catch(err){testo=String(err&&err.message||err);}
+    try{canaleGoogle&&canaleGoogle.postMessage({tipo:'esito',ok,testo});}catch(_e){}
+    if(daMemoria||!ok){mostraStato(ok?'Google Calendar collegato':'Collegamento a Google Calendar non riuscito: '+(testo||'riprova'),true,!ok);if(!ok)setTimeout(()=>{box&&box.remove();box=null;},8000);}
+    if(ok)setTimeout(()=>{try{document.querySelector('.nav-item.active')?.click();}catch(_e){}},300);
+  }
+  function controllaRitornoGoogle(){
+    if(document.visibilityState==='hidden')return;
+    let v=null;try{v=JSON.parse(localStorage.getItem(CHIAVE_RITORNO)||'null');}catch(_e){}
+    if(!v||!v.q)return;
+    if(Date.now()-Number(v.t||0)>600000){try{localStorage.removeItem(CHIAVE_RITORNO);}catch(_e){}return;}
+    void completaGoogle(v.q,true);
+  }
   try{
-    const canale=new BroadcastChannel('dossier-google-oauth');
-    canale.onmessage=async e=>{const q=e.data&&e.data.query;if(!q||e.data.tipo!=='ritorno')return;
-      let ok=false,testo='';
-      try{const r=await window.fetch('http://127.0.0.1:'+PORTA+'/?'+q);ok=r.ok;testo=(await r.text()).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();}catch(err){testo=String(err&&err.message||err);}
-      canale.postMessage({tipo:'esito',ok,testo});};
+    canaleGoogle=new BroadcastChannel('dossier-google-oauth');
+    canaleGoogle.onmessage=e=>{const q=e.data&&e.data.query;if(!q||e.data.tipo!=='ritorno')return;void completaGoogle(q,false);};
   }catch(_e){}
+  document.addEventListener('visibilitychange',controllaRitornoGoogle);window.addEventListener('focus',controllaRitornoGoogle);
+  setInterval(controllaRitornoGoogle,3000);setTimeout(controllaRitornoGoogle,1000);
 
   // ---------------------------------------------------------------------
   // Avvisi del browser. Nell'exe li mostrano le Operazioni pianificate di
@@ -193,7 +214,9 @@
   function pulsantePermesso(){
     const ra=document.querySelector('.agenda-provider-strip .row-actions');if(!ra)return;
     const b=document.getElementById('ponteAttivaAvvisi');
-    if(permesso()==='granted'||permesso()==='unsupported'){if(b)b.remove();return;}
+    // sul telefono gli avvisi del browser arrivano solo a pagina aperta: il pulsante non si mostra
+    const telefono=(()=>{try{return !!window.FotoDocumento?.isTelefono?.();}catch(_e){return false;}})();
+    if(telefono||permesso()==='granted'||permesso()==='unsupported'){if(b)b.remove();return;}
     if(b)return;
     const n=document.createElement('button');n.type='button';n.id='ponteAttivaAvvisi';n.className='btn btn-primary btn-small';
     n.textContent=permesso()==='denied'?'Avvisi bloccati dal browser':'Attiva avvisi del browser';

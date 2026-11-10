@@ -9,14 +9,17 @@
   // la risposta di Google non deve restare nella barra degli indirizzi
   try{history.replaceState(null,'',location.pathname);}catch(e){}
   if(!q){t.textContent='Nessuna risposta da Google';m.textContent='Torna al Dossier e ripeti il collegamento.';return;}
+  // la risposta resta anche nella memoria del sito: se la scheda del Dossier e' sospesa (telefono) la completa al rientro
+  var salvata=false;try{localStorage.setItem('dossierGoogleRitorno',JSON.stringify({q:q,t:Date.now()}));salvata=true;}catch(e){}
   var c;try{c=new BroadcastChannel('dossier-google-oauth');}catch(e){}
-  if(!c){t.textContent='Browser non compatibile';m.textContent='Questo browser non permette di completare il collegamento.';return;}
+  if(!c&&!salvata){t.textContent='Browser non compatibile';m.textContent='Questo browser non permette di completare il collegamento.';return;}
+  if(!c){t.textContent='Torna alla scheda del Dossier';m.textContent='Il collegamento a Google Calendar si completa lì. Questa scheda si può chiudere.';return;}
   var finito=false;
   c.onmessage=function(e){var d=e.data||{};if(d.tipo!=='esito')return;finito=true;
     t.textContent=d.ok?'Google Calendar collegato':'Collegamento non riuscito';
     m.textContent=d.ok?'Puoi chiudere questa finestra e tornare al Dossier.':(d.testo||'Torna al Dossier e ripeti il collegamento.');
     if(d.ok)setTimeout(function(){window.close();},1500);};
   c.postMessage({tipo:'ritorno',query:q});
-  setTimeout(function(){if(!finito){t.textContent='Il Dossier non ha risposto';m.textContent='Tieni aperta la scheda del Dossier, poi ripeti il collegamento.';}},20000);
+  setTimeout(function(){if(!finito){t.textContent='Torna alla scheda del Dossier';m.textContent=salvata?'Il collegamento a Google Calendar si completa quando riapri la scheda del Dossier. Questa scheda si può chiudere.':'Tieni aperta la scheda del Dossier, poi ripeti il collegamento.';}},4000);
 })();
 </script></body></html>
