@@ -14,7 +14,7 @@
     if(worker)return worker;
     // Il motore parte da un piccolo avvio interno alla pagina: cosi' eredita sempre l'isolamento
     // della pagina (serve per usare piu' processori) senza dipendere dalle intestazioni del file.
-    const avvio=new Blob(["importScripts("+JSON.stringify(base+'engine-worker.js?v=web15')+");"],{type:'text/javascript'});
+    const avvio=new Blob(["importScripts("+JSON.stringify(base+'engine-worker.js?v=web16')+");"],{type:'text/javascript'});
     worker=new Worker(URL.createObjectURL(avvio));
     worker.onmessage=e=>{const m=e.data||{};
       if(m.tipo==='cloudDiretta'){const d=diretti.get(m.id);if(d){diretti.delete(m.id);d(m.esito||{ok:false,error:'Risposta vuota'});}return;}

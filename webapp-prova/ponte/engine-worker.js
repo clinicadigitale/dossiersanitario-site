@@ -139,7 +139,7 @@ async function scaricaMega(n){
   return await new Promise((ok,ko)=>{let s;try{s=n.download({});}catch(e){ko(e);return;}
     const parti=[];let tot=0,ultimo=0;const totale=Number(n.size)||0;
     const avvisa=(car,fine)=>{const ora=Date.now();if(!fine&&ora-ultimo<400)return;ultimo=ora;try{postMessage({tipo:'cloudProgresso',caricati:car,totale:totale||car});}catch(_){}};
-    s.on('data',c=>{const u=c instanceof Uint8Array?c:new Uint8Array(c);parti.push(u);tot+=u.length;avvisa(tot,false);});
+    s.on('data',c=>{const u=c instanceof Uint8Array?c:new Uint8Array(c);parti.push(u);tot+=u.length;self.__ultimoDatoCloud=Date.now();avvisa(tot,false);});
     s.on('error',ko);
     s.on('end',()=>{avvisa(tot,true);const out=new Uint8Array(tot);let o=0;for(const u of parti){out.set(u,o);o+=u.length;}ok(out);});});}
 self.cloudOp=async(op,connJson,argsJson,dati)=>{
@@ -147,8 +147,10 @@ self.cloudOp=async(op,connJson,argsJson,dati)=>{
   const corpo=dati?new Uint8Array(dati):null;
   try{
     // tempo massimo per ogni operazione: un trasferimento rimasto appeso non deve bloccare tutto il Dossier
-    const limite=120000+Math.round((corpo?corpo.byteLength:0)/40);let timer;
-    if(conn.type==='mega')return await Promise.race([operazioneMega(op,conn,a,corpo),new Promise(r=>{timer=setTimeout(()=>r({ok:false,code:'error',error:'Tempo scaduto per l’operazione su MEGA ('+op+')'}),limite);})]).finally(()=>clearTimeout(timer));
+    // invii: limite in base alla dimensione; scaricamenti: si interrompe solo se per 2 minuti non arriva niente
+    const limite=120000+Math.round((corpo?corpo.byteLength:0)/40);let timer;const inizio=Date.now();
+    const scade=new Promise(r=>{timer=setInterval(()=>{const ora=Date.now();const fermo=op==='read'?ora-Math.max(inizio,self.__ultimoDatoCloud||0)>120000:(op==='copy'||op==='move')?ora-inizio>1800000:ora-inizio>limite;if(fermo)r({ok:false,code:'error',error:'Tempo scaduto per l’operazione su MEGA ('+op+')'});},5000);});
+    if(conn.type==='mega')return await Promise.race([operazioneMega(op,conn,a,corpo),scade]).finally(()=>clearInterval(timer));
     return {ok:false,code:'error',error:'Servizio cloud non ancora disponibile nel browser'};
   }catch(e){const t=String(e&&e.message||e);return {ok:false,code:/not found|ENOENT/i.test(t)?'notfound':'error',error:t};}
 };
