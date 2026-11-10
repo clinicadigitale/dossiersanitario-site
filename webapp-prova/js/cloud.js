@@ -959,6 +959,8 @@ Conservare separatamente dal computer e dal cloud. Chi possiede questa chiave pu
   }
 
   async function importFamilyAccess(bundle,onProgress){
+    // Senza un avanzamento esterno (accesso con password familiare) mostra la finestra di avanzamento del collegamento.
+    if(!onProgress){const ui=openCloudRecoveryProgress();try{return await importFamilyAccess(bundle,(pct,fase,dettaglio)=>ui.update(pct,fase,dettaglio)||ui);}catch(error){ui.update(0,'Collegamento non completato',italianCloudError(error));await new Promise(r=>setTimeout(r,1500));throw error;}finally{ui.close();}}
     if(!bundle||bundle.version!==1||!bundle.archiveId||!bundle.remoteSection||!bundle.recoveryKey)throw new Error('Autorizzazione cloud familiare incompleta.');
     await DossierDB.open();
     let st=await status();
@@ -978,7 +980,7 @@ Conservare separatamente dal computer e dal cloud. Chi possiede questa chiave pu
     const snap=await latestSnapshot(row);if(!snap)throw new Error('Nessuna copia valida trovata nell’archivio familiare.');
     const remote=cloudPath(`snapshots/${snap.Path||snap.Name}`,row);
     onProgress?.(22,'Download archivio','Scaricamento della copia cifrata del Dossier familiare.');
-    const encrypted=await download(remote);
+    const encrypted=await downloadStream(remote,(bytes,total,pct,fasi)=>{const localPct=Number.isFinite(Number(pct))?Number(pct):(total?bytes/total*100:0);const ui=onProgress?.(22+localPct*.32,'Download copia completa',total?'':'Preparazione download');if(ui?.fasi&&fasi&&fasi.total)ui.fasi([{titolo:'Scaricamento da MEGA',quota:fasi.cloud,testo:`${formatTransferBytes(fasi.cloud*fasi.total)} / ${formatTransferBytes(fasi.total)}`},{titolo:'Preparazione nel Dossier',quota:fasi.locale,testo:`${formatTransferBytes(fasi.locale*fasi.total)} / ${formatTransferBytes(fasi.total)}`}]);});
     onProgress?.(55,'Decifratura locale','Apertura della copia cifrata sul dispositivo.');
     const decoded=await decryptBlob(encrypted,raw);decoded.blob.name='dossier_family_invite_restore.zip';
     const manifestMediaFormat=String(manifest.mediaFormat||'');
