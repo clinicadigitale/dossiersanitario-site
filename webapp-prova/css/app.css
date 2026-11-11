@@ -6598,3 +6598,13 @@ html,body{background:#eef4f9;color:#173956}
 
 /* Menu a tendina e campi mai piu' larghi del riquadro */
 #viewContainer select.form-control, #viewContainer input.form-control { max-width: 100%; min-width: 0; }
+
+/* Monitoraggio · sezioni: una per riga su schermi stretti, titolo e descrizione a sinistra, valore e pulsante a destra */
+#viewContainer .monitor-home-module-grid { container-type: inline-size; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20em), 1fr)) !important; }
+@container (max-width: 40em) {
+  #viewContainer .monitor-home-module-grid .module-card { display: grid !important; grid-template-columns: minmax(0,1fr) auto; grid-template-areas: "titolo valore" "testo pulsante"; gap: 4px 12px !important; min-height: 0 !important; padding: 12px 14px !important; align-items: center; }
+  #viewContainer .monitor-home-module-grid .module-card > h3 { grid-area: titolo; }
+  #viewContainer .monitor-home-module-grid .module-card > .kpi-note { grid-area: testo; margin: 0; }
+  #viewContainer .monitor-home-module-grid .module-card > .badge { grid-area: valore; justify-self: end; white-space: nowrap; }
+  #viewContainer .monitor-home-module-grid .module-card > .btn { grid-area: pulsante; margin: 0 !important; justify-self: end; align-self: end; white-space: nowrap; }
+}
