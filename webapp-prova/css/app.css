@@ -6634,5 +6634,9 @@ html,body{background:#eef4f9;color:#173956}
 #viewContainer .agenda-event-row.tone-red { border-left-color: #d63a3a !important; }
 #viewContainer .agenda-event-row.tone-teal { border-left-color: #008e88 !important; }
 #viewContainer .agenda-event-row.tone-green { border-left-color: #138f5a !important; }
-#viewContainer .agenda-event-row.tone-blue { border-left-color: #0877d1 !important; }
+#viewContainer .agenda-event-row.tone-blue { border-left-color: #dc3157 !important; }
 #viewContainer .agenda-event-row.tone-amber { border-left-color: #dc3157 !important; }
+
+/* Agenda: scadenze e documenti con icona rossa, uguale al bordo */
+#viewContainer .agenda-event-row.tone-blue > .agenda-event-icon, #viewContainer .agenda-event-row.tone-amber > .agenda-event-icon,
+#viewContainer .agenda-detail-icon.blue, #viewContainer .agenda-detail-icon.amber { background: linear-gradient(145deg,#dc3157,#f45b7c) !important; color: #fff !important; }
