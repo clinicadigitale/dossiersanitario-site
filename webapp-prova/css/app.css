@@ -6626,3 +6626,13 @@ html,body{background:#eef4f9;color:#173956}
 #viewContainer .agenda-detail-panel.agenda-detail-inline { position: static !important; top: auto !important; max-height: none !important; min-height: 0 !important; height: auto !important; margin: 6px 0 14px !important; border: 1px solid #dfe7ee !important; border-radius: 12px !important; overflow: visible !important; }
 #viewContainer .agenda-event-titleline > .badge { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 #viewContainer .agenda-event-content .family-member-pills > * { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+
+/* Agenda: bordo sinistro dello stesso colore dell'icona (farmaci viola, visite rosse, ...) */
+#viewContainer .agenda-event-row[class*="tone-"] { border-left-width: 4px !important; border-left-style: solid !important; }
+#viewContainer .agenda-event-row.tone-violet { border-left-color: #704fe1 !important; }
+#viewContainer .agenda-event-row.tone-rose { border-left-color: #dc3157 !important; }
+#viewContainer .agenda-event-row.tone-red { border-left-color: #d63a3a !important; }
+#viewContainer .agenda-event-row.tone-teal { border-left-color: #008e88 !important; }
+#viewContainer .agenda-event-row.tone-green { border-left-color: #138f5a !important; }
+#viewContainer .agenda-event-row.tone-blue { border-left-color: #0877d1 !important; }
+#viewContainer .agenda-event-row.tone-amber { border-left-color: #dc3157 !important; }
