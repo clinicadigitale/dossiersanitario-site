@@ -305,5 +305,19 @@
   }
   document.addEventListener('DOMContentLoaded',()=>{if(!pronto)mostraStato('Preparazione del motore del Dossier nel browser…');});
   avvia();
-  window.DossierPonteWeb={pronto:()=>pronto,cloudDiretta};
+  // Chiede al browser di non cancellare mai da solo i dati del Dossier (senza, Chrome su telefono li puo' eliminare quando gli serve spazio).
+  let memoriaPermanente=null;
+  async function chiediMemoriaPermanente(){
+    try{
+      if(!navigator.storage?.persist)return null;
+      if(await navigator.storage.persisted())return memoriaPermanente=true;
+      memoriaPermanente=await navigator.storage.persist();
+      if(!memoriaPermanente)console.warn('Memoria permanente non concessa dal browser: i dati potrebbero essere cancellati se il dispositivo resta senza spazio.');
+      return memoriaPermanente;
+    }catch(_e){return null;}
+  }
+  void chiediMemoriaPermanente();setTimeout(()=>{if(memoriaPermanente!==true)void chiediMemoriaPermanente();},120000);
+  window.addEventListener('dossier-unlocked',()=>{if(memoriaPermanente!==true)void chiediMemoriaPermanente();});
+  window.addEventListener('appinstalled',()=>{void chiediMemoriaPermanente();});
+  window.DossierPonteWeb={pronto:()=>pronto,cloudDiretta,memoriaPermanente:()=>memoriaPermanente,chiediMemoriaPermanente};
 })();
