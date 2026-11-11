@@ -6563,10 +6563,11 @@ html,body{background:#eef4f9;color:#173956}
   #viewContainer .document-row-modern > .document-modern-icon { grid-area: icona; width: 38px !important; height: 38px !important; }
   #viewContainer .document-row-modern > .document-row-title { grid-area: titolo; }
   #viewContainer .document-row-modern > .document-row-cell:nth-child(4) { grid-area: strutt; }
+  #viewContainer .document-row-modern > .document-row-cell { align-self: start !important; }
   #viewContainer .document-row-modern > .document-row-cell:nth-child(5) { grid-area: cont; }
   #viewContainer .document-row-modern > .document-row-status { grid-area: stato; }
   #viewContainer .document-row-modern > .document-row-actions { grid-area: azioni; justify-content: flex-end !important; flex-wrap: wrap !important; }
-  #viewContainer .document-row-modern strong { overflow-wrap: anywhere; }
+  #viewContainer .document-row-modern strong, #viewContainer .document-row-modern small, #viewContainer .document-row-modern span { overflow-wrap: anywhere; white-space: normal !important; text-overflow: clip !important; overflow: visible !important; }
 
   /* Agenda e Monitoraggio: pulsanti sotto il titolo invece che accanto */
   #viewContainer .agenda-main-head { flex-direction: column !important; align-items: stretch !important; }
