@@ -581,8 +581,13 @@ const HealthCharts = (() => {
     return {left,titleX};
   }
 
+  // Su schermi stretti il grafico si disegna alla larghezza reale, cosi' testi e punti restano leggibili.
+  function chartSize(compact=false){
+    let w=960;try{const vw=Math.min(window.innerWidth||960,document.documentElement.clientWidth||960);if(vw<1000)w=Math.max(340,Math.min(960,Math.round(vw-40)));}catch(_e){}
+    const narrow=w<960;return {width:w,height:narrow?Math.round(Math.max(300,Math.min(compact?330:410,w*0.82))):(compact?330:410),narrow};
+  }
   function svg(series=[],opts={}) {
-    const width=960,height=410;
+    const size=chartSize(false),width=size.width,height=size.height;
     const valid=series.filter(x=>x.clinicalDate&&Number.isFinite(Number(x.value))).sort((a,b)=>a.clinicalDate.localeCompare(b.clinicalDate));
     if(!valid.length)return '<div class="notice">Non ci sono valori validi e datati per questo grafico.</div>';
     const dates=valid.map(x=>new Date(`${x.clinicalDate}T12:00:00`).getTime());
@@ -590,7 +595,7 @@ const HealthCharts = (() => {
     const reference=referenceForSeries(valid);
     const referenceValues=[reference?.lower,reference?.upper].filter(Number.isFinite);
     let minX=Math.min(...dates),maxX=Math.max(...dates);if(minX===maxX){minX-=86400000*15;maxX+=86400000*15;}
-    const timeAxis=tickDates(minX,maxX,18);const plotMinX=timeAxis.domainMin??minX,plotMaxX=timeAxis.domainMax??maxX;
+    const timeAxis=tickDates(minX,maxX,size.narrow?Math.max(4,Math.round(width/80)):18);const plotMinX=timeAxis.domainMin??minX,plotMaxX=timeAxis.domainMax??maxX;
     let minY=Math.min(...vals,...referenceValues),maxY=Math.max(...vals,...referenceValues);const span=maxY-minY;const margin=(span||Math.max(1,Math.abs(maxY)*0.08))*0.18;minY-=margin;maxY+=margin;
     const yTickValues=Array.from({length:6},(_,i)=>maxY-i*(maxY-minY)/5);
     const yTickLabels=yTickValues.map(fmt);
@@ -612,7 +617,7 @@ const HealthCharts = (() => {
 
 
   function timelineSvg(seriesList=[],opts={}) {
-    const compact=Boolean(opts.compact);const width=960,height=compact?330:410;
+    const compact=Boolean(opts.compact);const size=chartSize(compact),width=size.width,height=size.height;
     const normalized=(seriesList||[]).map((s,index)=>({
       name:s.name||`Serie ${index+1}`,unit:s.unit||opts.unit||'',className:s.className||`monitor-series-${index%5}`,
       points:(s.points||[]).filter(x=>x.date&&Number.isFinite(Number(x.value))).map(x=>({...x,value:Number(x.value)})).sort((a,b)=>a.date.localeCompare(b.date))
@@ -620,7 +625,7 @@ const HealthCharts = (() => {
     const all=normalized.flatMap(s=>s.points.map(p=>({...p,series:s})));if(!all.length)return '<div class="notice">Non ci sono valori validi e datati per questo grafico.</div>';
     const dates=all.map(x=>new Date(`${x.date}T${x.time||'12:00'}:00`).getTime());const vals=all.map(x=>Number(x.value));
     let minX=Math.min(...dates),maxX=Math.max(...dates);if(minX===maxX){minX-=86400000*15;maxX+=86400000*15;}
-    const timeAxis=tickDates(minX,maxX,compact?14:18);const plotMinX=timeAxis.domainMin??minX,plotMaxX=timeAxis.domainMax??maxX;
+    const timeAxis=tickDates(minX,maxX,size.narrow?Math.max(4,Math.round(width/80)):(compact?14:18));const plotMinX=timeAxis.domainMin??minX,plotMaxX=timeAxis.domainMax??maxX;
     const refs=(opts.references||[]).filter(r=>Number.isFinite(Number(r.value))).map(r=>Number(r.value));
     let minY=Math.min(...vals,...refs),maxY=Math.max(...vals,...refs);const span=maxY-minY;const margin=(span||Math.max(1,Math.abs(maxY)*.08))*.18;minY-=margin;maxY+=margin;
     const yTickValues=Array.from({length:6},(_,i)=>maxY-i*(maxY-minY)/5);

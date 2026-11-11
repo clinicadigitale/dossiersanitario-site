@@ -2956,7 +2956,7 @@ const App = (() => {
     if(!state.selectedCalendarEventId||!upcoming.some(x=>x.id===state.selectedCalendarEventId))state.selectedCalendarEventId=upcoming[0]?.id||'';
     const selected=upcoming.find(x=>x.id===state.selectedCalendarEventId)||null;
     const googleConsent=Boolean(state.googleCalendarStatus?.healthDataConsent?.granted),googleConnected=Boolean(state.googleCalendarStatus?.connected);
-    const localBadge=localStatus.supported?'<span class="badge success">Avvisi del browser attivi</span>':'<span class="badge warning">Avvisi del browser da attivare</span>';
+    const localBadge=window.FotoDocumento?.isTelefono?.()?'':localStatus.supported?'<span class="badge success">Avvisi del browser attivi</span>':'<span class="badge warning">Avvisi del browser da attivare</span>';
     const googleBadge=googleConnected?(googleConsent?'<span class="badge success">Google Calendar collegato</span>':'<span class="badge warning">Google collegato · consenso sospeso</span>'):state.googleCalendarStatus?.configured?'<span class="badge warning">Google Calendar da ricollegare</span>':'<span class="badge">Google Calendar non collegato</span>';
     const categories=['Tutti',...new Set(allUpcoming.map(x=>x.category).filter(Boolean))];
     const listHtml=`<div class="agenda-split"><div class="agenda-list-pane"><div class="agenda-filter-row"><input id="calendarQuickSearch" class="form-control" placeholder="Cerca appuntamenti…" value="${esc(state.calendarQuery||'')}"><select id="calendarCategoryFilter" class="form-control">${categories.map(x=>`<option value="${esc(x)}" ${x===cat?'selected':''}>${esc(x)}</option>`).join('')}</select></div><div class="agenda-scroll-list">${calendarGroupedList(upcoming)}</div></div>${calendarDetailsHtml(selected)}</div>`;
