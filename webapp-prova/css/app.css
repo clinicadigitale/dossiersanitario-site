@@ -6652,3 +6652,25 @@ html,body{background:#eef4f9;color:#173956}
   #viewContainer .form-grid { grid-template-columns: minmax(0,1fr) !important; }
   #viewContainer .form-grid > * { grid-column: 1 / -1 !important; min-width: 0; }
 }
+
+/* Utenti autorizzati: schede per persona sui riquadri stretti, tabella sul computer */
+#viewContainer .permission-cards { display: none; }
+@container (max-width: 46em) {
+  #viewContainer .permission-matrix-wrap { display: none !important; }
+  #viewContainer .permission-cards { display: grid; gap: 12px; margin: 10px 0; }
+}
+#viewContainer .permission-card { border: 1px solid #dbe6ef; border-radius: 16px; background: #fff; padding: 14px; box-shadow: 0 6px 16px rgba(18,58,96,.05); }
+#viewContainer .permission-card-head { display: flex; gap: 10px; align-items: flex-start; }
+#viewContainer .permission-card-avatar { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; color: #fff; background: linear-gradient(145deg,#0f766e,#22a594); }
+#viewContainer .permission-card-head strong { display: block; font-size: 16px; color: #173f63; }
+#viewContainer .permission-card-head small { display: block; color: #6b8193; overflow-wrap: anywhere; }
+#viewContainer .permission-card-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+#viewContainer .permission-card > .kpi-note { margin: 10px 0 0; }
+#viewContainer .permission-card-active { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding: 9px 11px; border: 1px solid #e3ebf1; border-radius: 11px; background: #f9fbfd; font-weight: 700; }
+#viewContainer .permission-card-active input { width: 20px; height: 20px; }
+#viewContainer .permission-card-group { margin-top: 12px; }
+#viewContainer .permission-card-group > p { margin: 0 0 6px; font-size: 12px; font-weight: 800; color: #6b8193; text-transform: uppercase; letter-spacing: .04em; }
+#viewContainer .permission-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5em), 1fr)); gap: 6px; }
+#viewContainer .permission-card-cap { display: flex; align-items: center; gap: 7px; padding: 7px 8px; border: 1px solid #e6edf2; border-radius: 9px; background: #fff; font-size: 13px; margin: 0; }
+#viewContainer .permission-card-cap input { width: 17px; height: 17px; margin: 0; flex: 0 0 17px; }
+#viewContainer .permission-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 12px; }
