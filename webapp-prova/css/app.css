@@ -6608,3 +6608,21 @@ html,body{background:#eef4f9;color:#173956}
   #viewContainer .monitor-home-module-grid .module-card > .badge { grid-area: valore; justify-self: end; white-space: nowrap; }
   #viewContainer .monitor-home-module-grid .module-card > .btn { grid-area: pulsante; margin: 0 !important; justify-self: end; align-self: end; white-space: nowrap; }
 }
+
+/* Agenda · voci: a sinistra icona e sotto l'ora; a destra pillole in alto, titolo, profili, informazioni e pillola degli avvisi */
+@container (max-width: 40em) {
+  #viewContainer .agenda-event-row { grid-template-columns: auto minmax(0,1fr) auto !important; grid-template-areas: "icona testo freccia" "ora testo freccia" ". avviso freccia"; gap: 4px 12px !important; align-items: start !important; }
+  #viewContainer .agenda-event-row > .agenda-event-icon { grid-area: icona; justify-self: center; }
+  #viewContainer .agenda-event-row > .agenda-event-time { grid-area: ora; text-align: center; }
+  #viewContainer .agenda-event-row > .agenda-event-content { grid-area: testo; min-width: 0; }
+  #viewContainer .agenda-event-row > .agenda-sync-pill { grid-area: avviso; justify-self: start; margin-top: 4px; }
+  #viewContainer .agenda-event-row > .agenda-event-chevron { grid-area: freccia; align-self: center; }
+  #viewContainer .agenda-event-titleline { flex-wrap: wrap !important; gap: 5px 6px !important; }
+  #viewContainer .agenda-event-titleline > .badge { order: 1; }
+  #viewContainer .agenda-event-titleline > strong { order: 2; flex: 1 1 100%; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; margin-top: 2px; }
+  #viewContainer .agenda-event-content .family-member-pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  #viewContainer .agenda-event-content > small, #viewContainer .agenda-event-content > .agenda-event-note { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; margin-top: 5px; }
+}
+#viewContainer .agenda-detail-panel.agenda-detail-inline { position: static !important; top: auto !important; max-height: none !important; min-height: 0 !important; height: auto !important; margin: 6px 0 14px !important; border: 1px solid #dfe7ee !important; border-radius: 12px !important; overflow: visible !important; }
+#viewContainer .agenda-event-titleline > .badge { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+#viewContainer .agenda-event-content .family-member-pills > * { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
