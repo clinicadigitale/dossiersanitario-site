@@ -6640,3 +6640,15 @@ html,body{background:#eef4f9;color:#173956}
 /* Agenda: scadenze e documenti con icona rossa, uguale al bordo */
 #viewContainer .agenda-event-row.tone-blue > .agenda-event-icon, #viewContainer .agenda-event-row.tone-amber > .agenda-event-icon,
 #viewContainer .agenda-detail-icon.blue, #viewContainer .agenda-detail-icon.amber { background: linear-gradient(145deg,#dc3157,#f45b7c) !important; color: #fff !important; }
+
+/* Preferenze · consenso Google Calendar: testo a tutta larghezza e pulsante sotto quando manca spazio */
+#viewContainer .pref-google-consent-row { display: flex !important; flex-wrap: wrap !important; align-items: flex-end !important; gap: 10px 14px !important; }
+#viewContainer .pref-google-consent-row > .check-row { flex: 1 1 22em !important; min-width: 0 !important; }
+#viewContainer .pref-google-consent-row > .row-actions { flex: 1 1 auto !important; justify-content: flex-end !important; flex-wrap: wrap !important; }
+
+/* Preferenze e moduli nelle sezioni: una colonna sola quando il riquadro e' stretto */
+#viewContainer .preference-section { container-type: inline-size; }
+@container (max-width: 40em) {
+  #viewContainer .form-grid { grid-template-columns: minmax(0,1fr) !important; }
+  #viewContainer .form-grid > * { grid-column: 1 / -1 !important; min-width: 0; }
+}
