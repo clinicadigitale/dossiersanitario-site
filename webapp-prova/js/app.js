@@ -1826,7 +1826,16 @@ const App = (() => {
       if(dailyUsage>0){
         if(remaining+0.0000001<dailyUsage)return cursor;
         remaining-=dailyUsage;
-        if(remaining<=0.0000001)return medicationReorderDateAdd(cursor,1);
+        if(remaining<=0.0000001){
+          // La scorta serve di nuovo al primo giorno di assunzione successivo,
+          // non il giorno dopo l'ultima dose (farmaci settimanali o a giorni alterni).
+          let next=medicationReorderDateAdd(cursor,1);
+          for(let k=0;k<400&&next;k++){
+            if(medicationReorderDailyUsageForRows(rows,next)>0)return next;
+            next=medicationReorderDateAdd(next,1);
+          }
+          return medicationReorderDateAdd(cursor,1);
+        }
       }
       cursor=medicationReorderDateAdd(cursor,1);
       if(!cursor)return'';

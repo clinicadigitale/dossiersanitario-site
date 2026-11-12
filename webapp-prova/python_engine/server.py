@@ -2251,6 +2251,12 @@ def _medication_depletion_date(start_date: str, total_units: float, daily_units:
                 return cursor.isoformat()
             remaining -= units
             if remaining <= 0.0000001:
+                # nuova scorta necessaria al primo giorno di assunzione successivo
+                nxt = cursor + datetime.timedelta(days=1)
+                for _k in range(8):
+                    if day_keys[nxt.weekday()] in allowed:
+                        return nxt.isoformat()
+                    nxt += datetime.timedelta(days=1)
                 return (cursor + datetime.timedelta(days=1)).isoformat()
         cursor += datetime.timedelta(days=1)
     return ""
