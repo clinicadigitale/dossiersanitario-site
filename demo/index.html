@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prova la demo | Clinica Digitale - Dossier Sanitario</title>
+<meta name="description" content="Prova il Dossier Sanitario senza account: dati di fantasia, nessun dato salvato.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0f766e">
+<link rel="icon" href="../images/favicon.png" type="image/png">
+<link rel="stylesheet" href="demo.css?v=1">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></symbol>
+<symbol id="i-pill" viewBox="0 0 24 24"><path d="M10.5 20.5a5 5 0 0 1-7-7l7-7a5 5 0 0 1 7 7z"/><path d="M8.5 8.5l7 7"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></symbol>
+<symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+</defs></svg>
+
+<div class="demo-banner">
+  <span><b>Versione dimostrativa</b> con dati di fantasia: puoi esplorare, ma niente viene salvato.</span>
+  <a class="btn btn-white" href="https://app.dossiersanitario.it">Inizia gratis</a>
+</div>
+
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="../index.html"><img src="../images/icon_brand.png" alt=""><span><strong>Clinica Digitale</strong><small>Dossier Sanitario</small></span></a>
+    <div class="profile-chip"><span class="avatar">MR</span><div><strong>Mario Rossi</strong><small>Profilo dimostrativo</small></div></div>
+    <nav class="nav" aria-label="Sezioni della demo">
+      <button data-view="panoramica" class="active"><svg><use href="#i-home"/></svg>Panoramica</button>
+      <button data-view="agenda"><svg><use href="#i-cal"/></svg>Agenda</button>
+      <button data-view="terapie"><svg><use href="#i-pill"/></svg>Terapie</button>
+      <button data-view="documenti"><svg><use href="#i-doc"/></svg>Documenti</button>
+      <button data-view="monitoraggio"><svg><use href="#i-chart"/></svg>Monitoraggio</button>
+      <button data-view="interoperabilita"><svg><use href="#i-link"/></svg>Interoperabilità</button>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <!-- PANORAMICA -->
+    <section class="view" id="v-panoramica">
+      <p class="didascalia">Ecco come appare il Dossier <span>· Mario Rossi è un profilo di fantasia</span></p>
+      <div class="hero-app">
+        <div><h1>Buongiorno, Mario!</h1><p>Qui trovi un riepilogo della tua situazione sanitaria e delle prossime attività.</p></div>
+        <div class="hero-mark"><span>La prevenzione oggi</span><span>per un domani più sereno.</span></div>
+      </div>
+      <div class="card welcome">
+        <span class="kicker">Prova queste tre cose</span>
+        <div class="tries">
+          <button class="try" data-go="documenti"><span class="ic blue"><svg><use href="#i-scan"/></svg></span><b>Leggi un referto</b><small>Guarda il Dossier riconoscere i valori degli esami</small></button>
+          <button class="try" data-go="terapie"><span class="ic violet"><svg><use href="#i-pill"/></svg></span><b>Modifica una terapia</b><small>Orari, dosaggi e riordino dei farmaci</small></button>
+          <button class="try" data-go="agenda"><span class="ic red"><svg><use href="#i-cal"/></svg></span><b>Apri una visita</b><small>Tutti i dettagli dell'appuntamento</small></button>
+        </div>
+      </div>
+      <p class="preview-label">Anteprima della Panoramica</p>
+      <picture class="shot"><source media="(max-width: 700px)" srcset="img/tel_panoramica.webp"><img src="img/pc_panoramica.webp" alt="Panoramica del Dossier dimostrativo" loading="lazy"></picture>
+    </section>
+
+    <!-- AGENDA -->
+    <section class="view" id="v-agenda" hidden>
+      <div class="view-head"><div><h1>Agenda</h1><p>Visite, esami e scadenze di tutta la famiglia.</p></div><button class="btn btn-primary" data-open="form-evento">Nuovo appuntamento</button></div>
+      <div class="card form-card" id="form-evento" hidden>
+        <h3>Nuovo appuntamento</h3>
+        <div class="grid2"><label>Titolo<input value="Visita oculistica"></label><label>Tipo<select><option>Visita</option><option>Esami</option><option>Scadenza</option></select></label>
+        <label>Data<input type="date" value="2026-12-09"></label><label>Ora<input type="time" value="16:00"></label>
+        <label class="full">Luogo<input value="Ambulatorio oculistico"></label></div>
+        <div class="row-actions"><button class="btn btn-light" data-close="form-evento">Annulla</button><button class="btn btn-primary" data-save>Salva</button></div>
+      </div>
+      <div class="card list-card">
+        <div class="day-head"><span>Mercoledì 18 Novembre 2026</span><small>1 voce</small></div>
+        <button class="event live tone-red" id="evento-live" aria-expanded="false">
+          <span class="ev-left"><span class="ic red solid"><svg><use href="#i-heart"/></svg></span><span class="ev-time"><b>10:30</b><small>45 min</small></span></span>
+          <span class="ev-body"><span class="pills"><span class="pill teal">Mario Rossi</span><span class="pill soft">Visita</span></span><b class="ev-title">Visita cardiologica di controllo</b><small>Ospedale Niguarda, Piazza Ospedale Maggiore 3, Milano</small></span>
+          <span class="chev">›</span>
+        </button>
+        <div class="event-detail" id="evento-dettaglio" hidden>
+          <dl><dt>Profilo</dt><dd>Mario Rossi</dd><dt>Data e ora</dt><dd>18/11/2026 · 10:30</dd><dt>Struttura</dt><dd>Ospedale Niguarda, Piazza Ospedale Maggiore 3, Milano</dd><dt>Note</dt><dd>Portare l'ultimo ecocardiogramma e l'elenco dei farmaci.</dd></dl>
+          <div class="map-box"><span class="ic teal"><svg><use href="#i-cal"/></svg></span><div><b>Tempo indicativo da casa</b><small>In auto, dall'indirizzo di casa del profilo</small></div><strong>circa 20 min</strong></div>
+          <div class="map-card"><iframe title="Mappa Ospedale Niguarda" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps?output=embed&amp;q=Ospedale%20Niguarda%2C%20Piazza%20Ospedale%20Maggiore%203%2C%2020162%20Milano&amp;z=16"></iframe><div class="map-foot"><span>Ospedale Niguarda, Piazza Ospedale Maggiore 3, 20162 Milano</span><a class="btn btn-light" href="https://www.google.com/maps/search/?api=1&amp;query=Ospedale%20Niguarda%2C%20Piazza%20Ospedale%20Maggiore%203%2C%2020162%20Milano" target="_blank" rel="noopener noreferrer">Apri mappa</a></div></div>
+          <div class="row-actions"><button class="btn btn-light" data-save>Completa</button><button class="btn btn-light" data-save>Modifica</button><button class="btn btn-danger" data-save>Elimina</button></div>
+        </div>
+        <p class="preview-label inner">Anteprima delle altre voci</p>
+        <picture class="shot flat"><source media="(max-width: 700px)" srcset="img/tel_agenda.webp"><img src="img/pc_agenda.webp" alt="Altre voci dell'agenda" loading="lazy"></picture>
+      </div>
+    </section>
+
+    <!-- TERAPIE -->
+    <section class="view" id="v-terapie" hidden>
+      <div class="view-head"><div><h1>Terapie</h1><p>Orari, dosaggi, scorte e riordino dei farmaci.</p></div><button class="btn btn-primary" data-save>Aggiungi terapia</button></div>
+      <div class="card therapy live">
+        <div class="th-top"><span class="ic violet solid"><svg><use href="#i-pill"/></svg></span><div class="th-name"><b>EUTIROX</b><small>Merck Serono S.p.A.</small></div><b class="th-time" id="th-ora">06:30</b></div>
+        <div class="th-grid"><div><small>Principio attivo</small><b>Levotiroxina sodica</b></div><div><small>Dosaggio</small><b id="th-dose">75 mcg</b></div></div>
+        <div class="th-freq"><small>Frequenza / indicazioni</small><span id="th-freq">1 compressa al mattino, a digiuno</span></div>
+        <label class="switch-row"><input type="checkbox" id="th-riordino" checked><span><b>Riordino automatico</b><small id="th-riordino-testo">Scorta per 18 giorni · promemoria di riordino il 26/11/2026</small></span></label>
+        <div class="th-actions"><span class="pill green">Attiva</span><div class="row-actions"><button class="btn btn-light" id="th-modifica">Modifica</button><button class="btn btn-danger" data-save>Elimina</button></div></div>
+        <div class="th-form" id="th-form" hidden>
+          <div class="grid2"><label>Orario<input id="f-ora" type="time" value="06:30"></label><label>Dosaggio<input id="f-dose" value="75 mcg"></label><label class="full">Frequenza / indicazioni<input id="f-freq" value="1 compressa al mattino, a digiuno"></label></div>
+          <div class="row-actions"><button class="btn btn-light" id="th-annulla">Annulla</button><button class="btn btn-primary" data-save>Salva</button></div>
+        </div>
+      </div>
+      <p class="preview-label">Anteprima delle altre terapie</p>
+      <picture class="shot"><source media="(max-width: 700px)" srcset="img/tel_terapie.webp"><img src="img/pc_terapie.webp" alt="Altre terapie" loading="lazy"></picture>
+    </section>
+
+    <!-- DOCUMENTI -->
+    <section class="view" id="v-documenti" hidden>
+      <div class="view-head"><div><h1>Documenti</h1><p>Carichi un referto e il Dossier ne legge il contenuto.</p></div></div>
+      <div class="card upload" id="doc-start">
+        <span class="ic blue big"><svg><use href="#i-scan"/></svg></span>
+        <div><h3>Leggi un referto</h3><p>Nella demo usiamo un referto di esempio con dati di fantasia. Nel Dossier vero carichi i tuoi PDF o le foto, e la lettura avviene sul tuo dispositivo.</p></div>
+        <button class="btn btn-primary" id="doc-avvia">Leggi il referto di esempio</button>
+      </div>
+      <div class="doc-work" id="doc-work" hidden>
+        <div class="card doc-paper"><img src="img/referto_esempio.webp" alt="Referto di esempio"><div class="scan-line" id="scan-line"></div></div>
+        <div class="card doc-result">
+          <div class="steps" id="doc-steps">
+            <div data-step="1"><span></span>Lettura del testo</div>
+            <div data-step="2"><span></span>Riconoscimento di data, struttura e paziente</div>
+            <div data-step="3"><span></span>Valori degli esami e intervalli di riferimento</div>
+          </div>
+          <div id="doc-out" hidden>
+            <h3>Esami di laboratorio del 04/11/2026</h3>
+            <div class="meta-pills"><span class="pill soft">Esami di laboratorio</span><span class="pill teal">Mario Rossi</span><span class="pill soft">Laboratorio Analisi Esempio</span></div>
+            <table class="values"><thead><tr><th>Esame</th><th>Valore</th><th>Riferimento</th></tr></thead><tbody>
+              <tr class="hi"><td>Glucosio</td><td>112 mg/dL</td><td>70 - 100</td></tr>
+              <tr class="hi"><td>Emoglobina glicata</td><td>6,4 %</td><td>4,0 - 6,0</td></tr>
+              <tr><td>Colesterolo totale</td><td>186 mg/dL</td><td>&lt; 200</td></tr>
+              <tr><td>Colesterolo HDL</td><td>52 mg/dL</td><td>&gt; 40</td></tr>
+              <tr class="hi"><td>Colesterolo LDL</td><td>118 mg/dL</td><td>&lt; 115</td></tr>
+              <tr><td>Trigliceridi</td><td>132 mg/dL</td><td>&lt; 150</td></tr>
+              <tr><td>Creatinina</td><td>0,94 mg/dL</td><td>0,70 - 1,20</td></tr>
+              <tr><td>TSH</td><td>2,10 µUI/mL</td><td>0,27 - 4,20</td></tr>
+            </tbody></table>
+            <p class="note">3 valori fuori intervallo. Nel Dossier vero finiscono anche nei grafici, per seguirli nel tempo.</p>
+            <div class="row-actions"><button class="btn btn-light" id="doc-ricomincia">Rileggi</button><button class="btn btn-primary" data-save>Salva nel Dossier</button></div>
+          </div>
+        </div>
+      </div>
+      <p class="preview-label">Anteprima della cronologia clinica</p>
+      <picture class="shot"><source media="(max-width: 700px)" srcset="img/tel_cronologia.webp"><img src="img/pc_cronologia.webp" alt="Cronologia clinica" loading="lazy"></picture>
+    </section>
+
+    <!-- MONITORAGGIO -->
+    <section class="view" id="v-monitoraggio" hidden>
+      <div class="view-head"><div><h1>Monitoraggio</h1><p>Peso, pressione, glicemia e altri valori nel tempo.</p></div></div>
+      <div class="kpis">
+        <div class="kpi"><span class="ic blue solid"><svg><use href="#i-chart"/></svg></span><div><small>Peso</small><b>81,2 kg</b><span>02/11/2026</span></div></div>
+        <div class="kpi"><span class="ic red solid"><svg><use href="#i-heart"/></svg></span><div><small>Pressione</small><b>124/78</b><span>05/11/2026</span></div></div>
+        <div class="kpi"><span class="ic violet solid"><svg><use href="#i-chart"/></svg></span><div><small>Glicemia</small><b>112 mg/dL</b><span>04/11/2026</span></div></div>
+      </div>
+      <div class="card">
+        <div class="view-head small"><h3>Percorso peso</h3><button class="btn btn-light" data-open="form-peso">Registra peso</button></div>
+        <div class="form-inline" id="form-peso" hidden><label>Peso (kg)<input type="number" step="0.1" value="80.8"></label><label>Data<input type="date" value="2026-11-12"></label><button class="btn btn-primary" data-save>Salva</button></div>
+        <picture class="shot flat"><source media="(max-width: 700px)" srcset="img/tel_grafico.webp"><img src="img/pc_grafico.webp" alt="Grafico del peso" loading="lazy"></picture>
+      </div>
+    </section>
+
+    <!-- INTEROPERABILITA -->
+    <section class="view" id="v-interoperabilita" hidden>
+      <div class="view-head"><div><h1>Interoperabilità</h1><p>Import ed export dei dati sanitari.</p></div></div>
+      <p class="preview-label">Anteprima della sezione</p>
+      <picture class="shot"><source media="(max-width: 700px)" srcset="img/tel_interoperabilita.webp"><img src="img/pc_interoperabilita.webp" alt="Interoperabilità" loading="lazy"></picture>
+    </section>
+  </main>
+</div>
+
+<div class="modal-back" id="demo-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="demo-modal-title">
+    <span class="ic teal big"><svg><use href="#i-lock"/></svg></span>
+    <h2 id="demo-modal-title">Questa è una versione dimostrativa</h2>
+    <p>Qui puoi esplorare il Dossier, ma i dati non vengono salvati. Per conservare i tuoi documenti, le terapie e gli appuntamenti apri il Dossier: il piano personale è gratuito.</p>
+    <div class="row-actions center"><button class="btn btn-light" id="demo-continua">Continua la demo</button><a class="btn btn-primary" href="https://app.dossiersanitario.it">Inizia gratis</a></div>
+  </div>
+</div>
+<script src="demo.js?v=1"></script>
+</body>
+</html>
