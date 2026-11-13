@@ -873,3 +873,22 @@ const DossierSecurity = (() => {
 
 window.addEventListener('unhandledrejection',event=>{const overlay=document.querySelector('#securityOverlay:not(.hidden)');if(!overlay)return;const error=document.querySelector('#securityError');if(error){error.textContent=`Operazione non completata: ${event.reason?.message||event.reason||'errore sconosciuto'}`;error.classList.remove('hidden');}console.error('Errore non gestito nel sistema di accesso:',event.reason);});
 globalThis.DossierSecurity = DossierSecurity;
+
+// pulsante "mostra password" accanto a ogni campo password del Dossier
+(function(){
+  const eye='<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+  const eyeOff='<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" d="M3 3l18 18"/></svg>';
+  function add(input){
+    if(!input||input.dataset.pwToggle||input.type!=='password')return;
+    input.dataset.pwToggle='1';
+    const wrap=document.createElement('span');wrap.className='pw-wrap';
+    input.parentNode.insertBefore(wrap,input);wrap.appendChild(input);
+    const btn=document.createElement('button');btn.type='button';btn.className='pw-toggle';btn.innerHTML=eye;btn.title='Mostra password';btn.setAttribute('aria-label','Mostra password');
+    btn.addEventListener('mousedown',e=>e.preventDefault());
+    btn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();const show=input.type==='password';input.type=show?'text':'password';btn.innerHTML=show?eyeOff:eye;const t=show?'Nascondi password':'Mostra password';btn.title=t;btn.setAttribute('aria-label',t);});
+    wrap.appendChild(btn);
+  }
+  function scan(root){(root.querySelectorAll?root:document).querySelectorAll('input[type="password"]').forEach(add);}
+  const start=()=>{scan(document);new MutationObserver(list=>{for(const m of list)for(const n of m.addedNodes){if(n.nodeType!==1)continue;if(n.matches?.('input[type="password"]'))add(n);else scan(n);}}).observe(document.body,{childList:true,subtree:true});};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
