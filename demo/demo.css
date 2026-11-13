@@ -144,3 +144,6 @@ input,select{font:inherit;padding:10px 12px;border:1px solid #cfdbe3;border-radi
   .map-card iframe{height:200px}.map-foot{flex-direction:column;align-items:stretch}
   dl{grid-template-columns:1fr;gap:2px}dd{margin-bottom:8px}
 }
+
+.avviso-fse{margin:0 0 16px;padding:16px 18px;border:1px solid #f1d39a;border-left:5px solid #d48a12;border-radius:12px;background:#fff8ec;color:#5b4210}
+.avviso-fse b{display:block;font-size:16px;color:#7a4b00;margin-bottom:6px}.avviso-fse p{margin:6px 0 0;font-size:15px;line-height:1.5}
