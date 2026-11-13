@@ -6040,15 +6040,19 @@ const App = (() => {
   function profileFolderName(p){return `${slug(p.firstName+'_'+p.lastName)}_${p.id.slice(-8)}`;}
   function arrayOrEmpty(value){return Array.isArray(value)?value:[];}
 
-  async function verifyBackupBlob(blob){
+  async function verifyBackupBlob(blob,onProgress=null){
+    const tick=(f,detail)=>{try{onProgress?.(Math.max(0,Math.min(1,f)),detail);}catch{}};
     const report={found:0,imported:0,skipped:0,duplicates:0,missing:[],corrupt:[],unassociated:[],legacy:false,message:''};
     let zip,manifest={};
+    tick(0,'Apertura dell’archivio scaricato.');
     try{zip=await JSZip.loadAsync(blob,{checkCRC32:true});}catch(error){report.corrupt.push(`Archivio ZIP: ${error.message}`);report.message='Il file ZIP è corrotto o incompleto.';return{ok:false,manifest,report,zip:null};}
     try{const mf=zip.file('manifest.json');if(!mf)throw new Error('manifest.json mancante');manifest=JSON.parse(await mf.async('string'));}catch(error){report.missing.push('manifest.json');report.message=`Manifest non leggibile: ${error.message}`;return{ok:false,manifest,report,zip};}
     if(manifest.app&&manifest.app!=='Dossier Sanitario Locale'){report.corrupt.push('Applicazione non riconosciuta');report.message='Il file non appartiene al Dossier Sanitario Locale.';return{ok:false,manifest,report,zip};}
     const entries=arrayOrEmpty(manifest.entries);report.legacy=!entries.length||Number(manifest.formatVersion||0)<6;
+    tick(0.15,'Archivio aperto. Controllo dei file.');
     if(entries.length){
-      for(const entry of entries){const file=zip.file(entry.path);if(!file){if(entry.required!==false)report.missing.push(entry.path);continue;}try{const bytes=await file.async('uint8array');report.found++;if(Number(entry.size)!==bytes.byteLength)report.corrupt.push(`${entry.path}: dimensione non corrispondente`);else if(entry.sha256&&(await backupHash(bytes))!==entry.sha256)report.corrupt.push(`${entry.path}: impronta SHA-256 non corrispondente`);}catch(error){report.corrupt.push(`${entry.path}: ${error.message}`);}}
+      let checked=0;
+      for(const entry of entries){checked++;if(checked%5===0||checked===entries.length)tick(0.15+0.8*(checked/entries.length),`${checked} / ${entries.length} file controllati`);const file=zip.file(entry.path);if(!file){if(entry.required!==false)report.missing.push(entry.path);continue;}try{const bytes=await file.async('uint8array');report.found++;if(Number(entry.size)!==bytes.byteLength)report.corrupt.push(`${entry.path}: dimensione non corrispondente`);else if(entry.sha256&&(await backupHash(bytes))!==entry.sha256)report.corrupt.push(`${entry.path}: impronta SHA-256 non corrispondente`);}catch(error){report.corrupt.push(`${entry.path}: ${error.message}`);}}
     }else{
       report.found=Object.keys(zip.files).filter(name=>!zip.files[name].dir).length;
     }
@@ -6315,11 +6319,11 @@ const App = (() => {
     if(backPath){p.healthCardBackBlob=await context.zip.file(backPath).async('blob');p.healthCardBackName=backPath.split('/').pop().replace(/^retro__/i,'');}
     return p;
   }
-  async function inspectBackupForUse(file){
+  async function inspectBackupForUse(file,onProgress=null){
     if(!file)throw new Error('Nessun file selezionato');
     if(!window.JSZip)throw new Error('Modulo ZIP non disponibile');
     const usableFile=await unwrapMigrationPackage(file);
-    const inspection=await verifyBackupBlob(usableFile);
+    const inspection=await verifyBackupBlob(usableFile,onProgress);
     state.lastRestoreReport={...inspection.report,message:inspection.report.message};
     if(!inspection.ok)throw new Error(inspection.report.message);
     const profilePaths=Object.keys(inspection.zip.files).filter(n=>/profili\/[^/]+\/profilo\.json$/.test(n));
@@ -6593,7 +6597,7 @@ const App = (() => {
       notify(8,'Preparazione database','Apertura delle sezioni da ripristinare.');if(plan.mode==='full')for(const store of plan.affectedStores)await DossierDB.clear(store);
       const order=['profiles','documents','doctors','therapies','diagnoses','exemptions','measurements','weightJourneys','documentVersions','calendarEvents','calendarSuggestions','vaccinations','interventions','symptoms','therapyAdherence','carePlans','dicomStudies','mediaAttachments','trash','settings','users','devices','auditLog','cloudSettings','syncQueue'];
       const totalRows=Math.max(1,order.reduce((n,store)=>n+(plan.operations[store]||[]).length,0));let appliedRows=0;
-      for(const store of order){const rows=plan.operations[store]||[];if(rows.length){await DossierDB.bulkPut(store,rows,{audit:false});report.imported+=rows.length;appliedRows+=rows.length;notify(10+(appliedRows/totalRows)*66,'Ripristino dati',`${appliedRows} / ${totalRows} elementi importati`);}}
+      for(const store of order){const rows=plan.operations[store]||[];for(let at=0;at<rows.length;at+=25){const chunk=rows.slice(at,at+25);await DossierDB.bulkPut(store,chunk,{audit:false});report.imported+=chunk.length;appliedRows+=chunk.length;notify(10+(appliedRows/totalRows)*66,'Ripristino dati',`${appliedRows} / ${totalRows} elementi importati`);}}
       await restoreMediaArchiveFiles(plan,notify);notify(87,'Verifica dati','Controllo degli elementi appena ripristinati.');const verifiedRows=await validateAppliedPlan(plan);
       if(plan.securityBundle){notify(90,'Sicurezza e accessi','Ripristino degli account e delle autorizzazioni.');const restoredCloud=(plan.operations.cloudSettings||[]).find(row=>row?.enabled);await DossierSecurity.restoreSecurityBackup(plan.securityBundle,{deviceCloudLinked:Boolean(restoredCloud),archiveId:restoredCloud?.archiveId||''});}if(plan.context?.migration){notify(94,'Ricevuta di migrazione','Generazione della prova tecnica dell’importazione verificata.');await createMigrationReceipt(plan,verifiedRows);}
       notify(96,'Verifica finale','Conferma della coerenza dell’archivio.');report.message=`Operazione “${restoreModeLabel(plan.mode)}” completata: ${report.imported} elementi importati, ${report.duplicates} duplicati già presenti, ${report.possibleDuplicates} possibili versioni simili conservate separatamente, ${report.conflicts} conflitti mantenuti nella versione attuale.`;state.lastRestoreReport=report;
@@ -6615,7 +6619,7 @@ const App = (() => {
     try{
     if(!file)return false;
     if(!options.mode&&!options.replaceAll)return prepareBackupUse(file);
-    try{const context=await inspectBackupForUse(file);const mode=options.mode||(options.replaceAll?'full':'merge');const mapping=options.profileMapping||Object.fromEntries(context.profiles.map(info=>[info.profile.id,info.suggestedTarget||'__new__']));const plan=await buildRestorePlan(context,mode,mapping,{restoreUsers:options.importUsers!==false});return applyRestorePlan(plan,options);}
+    try{const outer=options.onProgress;const verifyShare=outer?30:0;const context=await inspectBackupForUse(file,outer?(f,detail)=>{try{outer({percent:f*verifyShare,phase:'Verifica archivio',detail});}catch{}}:null);if(outer)options={...options,onProgress:info=>outer({...info,percent:verifyShare+Number(info?.percent||0)*(100-verifyShare)/100})};const mode=options.mode||(options.replaceAll?'full':'merge');const mapping=options.profileMapping||Object.fromEntries(context.profiles.map(info=>[info.profile.id,info.suggestedTarget||'__new__']));const plan=await buildRestorePlan(context,mode,mapping,{restoreUsers:options.importUsers!==false});return applyRestorePlan(plan,options);}
     catch(error){console.error('Ripristino non riuscito:',error);state.lastRestoreReport={mode:options.mode||'merge',found:0,imported:0,duplicates:0,conflicts:0,createdProfiles:0,missing:[],corrupt:[error.message],unassociated:[],message:`Operazione non riuscita: ${error.message}`};toast(state.lastRestoreReport.message);return false;}
     finally{if(options.mode||options.replaceAll)resetBackupInput();}
     }finally{DossierSecurity.endTechnicalActivity?.('backup-restore-operation');}
