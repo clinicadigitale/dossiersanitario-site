@@ -443,10 +443,11 @@ const DossierSecurity = (() => {
   }
 
   function showInitialSetup(){
-    showOverlay(`<div class="security-brand"><img src="assets/icon-192.png" alt=""><div><span>PRIMA CONFIGURAZIONE</span><h1>Dossier Sanitario Locale</h1></div></div><h2>Come vuoi iniziare?</h2><p>Scegli se creare un nuovo Dossier, entrare in un Dossier familiare con la password ricevuta dall’amministratore oppure ripristinare un backup locale.</p><div id="securityError" class="notice danger hidden"></div><div class="security-form"><button type="button" id="newDossierChoice" class="btn btn-primary btn-full">Crea un nuovo Dossier</button><button type="button" id="temporaryFamilyChoice" class="btn btn-light btn-full">Ho una password familiare</button><button type="button" id="localBackupChoice" class="btn btn-light btn-full">Ripristina da backup locale</button></div><p class="security-help">Per entrare in un Dossier familiare serve soltanto la password di 15 caratteri generata dall’amministratore. Non servono codici lunghi, link speciali o credenziali del provider cloud.</p>`);
+    showOverlay(`<div class="security-brand"><img src="assets/icon-192.png" alt=""><div><span>PRIMA CONFIGURAZIONE</span><h1>Dossier Sanitario Locale</h1></div></div><h2>Come vuoi iniziare?</h2><p>Scegli se creare un nuovo Dossier, entrare in un Dossier familiare con la password ricevuta dall’amministratore oppure ripristinare un backup locale.</p><div id="securityError" class="notice danger hidden"></div><div class="security-form"><button type="button" id="newDossierChoice" class="btn btn-primary btn-full">Crea un nuovo Dossier</button><button type="button" id="temporaryFamilyChoice" class="btn btn-light btn-full">Ho una password familiare</button><button type="button" id="localBackupChoice" class="btn btn-light btn-full">Ripristina un archivio esistente</button></div><p class="security-help">Per entrare in un Dossier familiare serve soltanto la password di 15 caratteri generata dall’amministratore. L’amministratore che usa un nuovo dispositivo sceglie invece Ripristina un archivio esistente.</p>`);
     document.querySelector('#newDossierChoice').onclick=showCreateAdminForm;
     document.querySelector('#temporaryFamilyChoice').onclick=showTemporaryFamilyAccessForm;
-    document.querySelector('#localBackupChoice').onclick=e=>{e.preventDefault();e.stopPropagation();chooseInitialLocalBackup();};
+    // amministratore su un nuovo dispositivo: ripristino dal cloud (MEGA + chiave di recupero) oppure da un backup locale
+    document.querySelector('#localBackupChoice').onclick=e=>{e.preventDefault();e.stopPropagation();showExistingArchiveOptions();};
   }
 
   function showTemporaryFamilyAccessForm(){
