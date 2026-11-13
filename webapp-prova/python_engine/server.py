@@ -5295,17 +5295,22 @@ def discover_dossier_archives(remote: str, base_path: str = "Dossier Sanitario L
 
     archives = []
     invalid = 0
-    for directory in archive_dirs:
+    seen_roots = set()
+
+    def inspect(parent: str, directory: str):
+        nonlocal invalid
         leaf = directory.replace("\\", "/").rstrip("/").split("/")[-1]
-        if not leaf.lower().startswith("archive_"):
-            continue
-        archive_root = f"{base}/{directory}".replace("//", "/").strip("/")
-        manifest_remote = f"{fs}{archive_root}/archive.json"
-        manifest = _read_cloud_json_cli(manifest_remote)
+        if not leaf.lower().startswith("archive_") or not parent.strip("/"):
+            return
+        archive_root = f"{parent}/{leaf}".replace("//", "/").strip("/")
+        if archive_root.casefold() in seen_roots:
+            return
+        seen_roots.add(archive_root.casefold())
+        manifest = _read_cloud_json_cli(f"{fs}{archive_root}/archive.json")
         archive_id = str(manifest.get("archiveId") or "")
         if manifest.get("format") != "DSL5-CLOUD" or not archive_id.startswith("archive_"):
             invalid += 1
-            continue
+            return
         snapshot_root = f"{archive_root}/snapshots"
         snapshot_items = [
             item for item in _cli_file_items(f"{fs}{snapshot_root}")
@@ -5313,26 +5318,62 @@ def discover_dossier_archives(remote: str, base_path: str = "Dossier Sanitario L
         ]
         if not snapshot_items:
             invalid += 1
-            continue
+            return
         snapshot_items.sort(key=_snapshot_sort_key, reverse=True)
         snap = dict(snapshot_items[0])
         snap_name = str(snap.get("Path") or snap.get("Name") or "").replace("\\", "/").lstrip("/")
         snap["Path"] = f"{snapshot_root}/{snap_name}".replace("//", "/")
         snap["Name"] = snap_name.split("/")[-1]
+        parent_clean = parent.strip("/")
         archives.append({
             "id": archive_id,
             "displayName": str(manifest.get("displayName") or "Archivio Dossier"),
             "root": archive_root,
-            "basePath": str(manifest.get("basePath") or base),
+            # la cartella reale in cui si trova l'archivio: una copia spostata in
+            # un'altra cartella deve restare collegata a quella copia
+            "basePath": parent_clean,
+            "folder": parent_clean,
             "manifestPath": f"{archive_root}/archive.json",
             "snapshot": snap,
             "modTime": str(snap.get("ModTime") or ""),
             "createdAt": str(manifest.get("createdAt") or ""),
         })
 
+    for directory in archive_dirs:
+        inspect(base, directory)
+
+    # Archivi copiati o creati in altre cartelle (es. PROVA/...): ricerca per
+    # cartelle fino a 3 livelli, senza entrare negli archivi. Vengono mostrati
+    # tutti con la loro cartella e la scelta resta all'utente.
+    queue = []
+    for top in root_dirs:
+        top_clean = top.replace("\\", "/").strip("/")
+        if top_clean and top_clean.casefold() != base.casefold():
+            queue.append((top_clean, 1))
+    listed = 0
+    while queue and listed < 80:
+        folder, depth = queue.pop(0)
+        leaf = folder.split("/")[-1]
+        if leaf.lower().startswith("archive_"):
+            inspect(folder.rsplit("/", 1)[0] if "/" in folder else "", leaf)
+            continue
+        try:
+            children = _cli_dir_names(fs + folder)
+        except Exception:
+            continue
+        listed += 1
+        for child in children:
+            child_leaf = child.replace("\\", "/").rstrip("/").split("/")[-1]
+            if not child_leaf:
+                continue
+            if child_leaf.lower().startswith("archive_"):
+                inspect(folder, child_leaf)
+            elif depth < 3:
+                queue.append((f"{folder}/{child_leaf}", depth + 1))
+
     if archives:
         archives.sort(key=lambda item: (str(item.get("modTime") or ""), str(item.get("snapshot", {}).get("Path") or "")), reverse=True)
-        return {"archives": archives, "reason": "", "baseFolderFound": True, "strategy": "direct"}
+        return {"archives": archives, "reason": "", "baseFolderFound": base_found, "strategy": "direct"}
 
     # Compatibilità con eventuali archivi storici collocati in un basePath
     # diverso. La scansione ricorsiva resta solo un fallback, non il percorso
