@@ -74,9 +74,27 @@ BUNDLED_RCLONE_EXE = ROOT / "runtime" / "rclone" / "rclone.exe"
 RCLONE_CONFIG = CLOUD_DIR / "rclone.conf"
 ALLOWED_ORIGINS = {f"http://{HOST}:{WEB_PORT}", f"http://localhost:{WEB_PORT}"}
 
+_CLOUD_RESTORE_BOOTSTRAP = {
+    "GET": {"/api/cloud/status", "/api/cloud/discover", "/api/cloud/list", "/api/cloud/stat", "/api/cloud/stream",
+            "/api/cloud/download", "/api/cloud/download-progress", "/api/cloud/download-chunk"},
+    "POST": {"/api/cloud/install", "/api/cloud/configure", "/api/cloud/download-start", "/api/cloud/download-finish"},
+}
+
+def _cloud_restore_bootstrap_allowed(path: str, method: str) -> bool:
+    """Su un dispositivo nuovo (nessun utente) la licenza non è ancora nota: il ripristino
+    dell'archivio esistente dal cloud deve poter leggere l'archivio. Solo operazioni di lettura."""
+    if path not in _CLOUD_RESTORE_BOOTSTRAP.get(method, set()):
+        return False
+    try:
+        return not AUTH.status().get("initialized")
+    except Exception:
+        return False
+
 def _license_required_for(path: str, method: str) -> str:
     path = str(path or "")
     method = str(method or "").upper()
+    if path.startswith("/api/cloud/") and _cloud_restore_bootstrap_allowed(path, method):
+        return ""
     if path.startswith("/api/calendar/google/") or path.startswith("/api/cloud/") or path.startswith("/api/doctor-export/"):
         return "MEDIUM"
     if method == "GET" and path in {
