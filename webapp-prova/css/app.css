@@ -6674,3 +6674,6 @@ html,body{background:#eef4f9;color:#173956}
 #viewContainer .permission-card-cap { display: flex; align-items: center; gap: 7px; padding: 7px 8px; border: 1px solid #e6edf2; border-radius: 9px; background: #fff; font-size: 13px; margin: 0; }
 #viewContainer .permission-card-cap input { width: 17px; height: 17px; margin: 0; flex: 0 0 17px; }
 #viewContainer .permission-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 12px; }
+
+/* backup: tolto l archivio fisico, le schede rimaste occupano tutta la larghezza */
+#viewContainer .backup-top-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))!important}

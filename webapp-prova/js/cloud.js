@@ -399,7 +399,7 @@ const DossierCloud = (() => {
     await postJson('/mkdir',{remote:remoteRoot(row)});await postJson('/mkdir',{remote:cloudPath('snapshots',row)});await postJson('/mkdir',{remote:cloudPath('changes',row)});await createManifest(row);await uploadSnapshot(row,raw);
     await DossierDB.clear('syncQueue');await DossierDB.put('cloudSettings',row,{audit:false,sync:false});settings=row;applySyncContext();await DossierSecurity.setDeviceCloudLinked(true,row.archiveId);await DossierSecurity.registerCurrentDevice({sync:true});
     const recoveryText=`DOSSIER SANITARIO LOCALE\nChiave di recupero archivio\n\nArchivio: ${displayName}\nIdentificativo: ${archiveId}\nServizio: ${remoteName}\n\nCHIAVE: ${formatRecovery(recovery)}\n\nConservare separatamente dal computer e dal cloud. Chi possiede questa chiave può decifrare l'archivio.`;
-    downloadText(recoveryText,`CHIAVE_RECUPERO_DOSSIER_${archiveId.slice(-8)}.txt`);alert(`Archivio cloud creato.\n\nLa chiave di recupero è stata salvata in un file sul computer. Conservala anche su carta o in un luogo separato.\n\nIdentificativo archivio:\n${archiveId}`);
+    downloadText(recoveryText,`CHIAVE_RECUPERO_DOSSIER_${archiveId.slice(-8)}.txt`);alert(`Archivio cloud creato.\n\nLa chiave di recupero è stata salvata in un file su questo dispositivo, nella cartella dei download. Conservala anche su carta o in un luogo separato.\n\nIdentificativo archivio:\n${archiveId}`);
     await refreshPanel();startAutomaticSync();
   }
 
