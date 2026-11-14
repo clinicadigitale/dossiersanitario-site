@@ -111,11 +111,14 @@ const DossierDoctorExport=(()=>{
       const d=allDocuments[i];
       const clean=cloneClean(d,new Set(['fileBlob','ocrPageData','_syncMeta']));
       clean.archiveVisible=d.timelineVisible!==false;
-      if(options.includeOriginals&&d.fileBlob instanceof Blob&&d.fileBlob.size){
+      // referto nel cloud (telefono leggero): si scarica solo per questa copia, senza salvarlo
+      let originale=d.fileBlob instanceof Blob&&d.fileBlob.size?d.fileBlob:null;
+      if(options.includeOriginals&&!originale&&typeof App!=='undefined'&&App.documentHasOriginal?.(d)){try{originale=await App.documentFile(d);}catch(error){console.warn('Referto originale non disponibile per la copia medico:',d.id,error);}}
+      if(options.includeOriginals&&originale instanceof Blob&&originale.size){
         const ext=(String(d.originalName||'').split('.').pop()||'bin').replace(/[^a-z0-9]/gi,'').slice(0,8)||'bin';
         const file=`${String(i+1).padStart(3,'0')}_${safeName(d.title||d.originalName||'documento')}_${safeName(d.id.slice(-6))}.${ext}`;
         clean.originalPath=`${base}/documenti/${file}`;
-        await addBlob(files,clean.originalPath,d.fileBlob);
+        await addBlob(files,clean.originalPath,originale);
       }
       docs.push(clean);
       if(i%10===9)await yieldUi();

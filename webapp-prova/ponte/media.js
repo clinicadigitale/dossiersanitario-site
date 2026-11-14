@@ -10,7 +10,8 @@
   'use strict';
   const NOME_CARTELLA='Clinica Digitale - Archivio';
   const MARCATORE='.clinica_digitale_media_archive.json';
-  const TETTO_TELEFONO=500*1024*1024;
+  // telefono leggero: solo una piccola memoria temporanea per i file aperti di recente
+  const TETTO_TELEFONO=100*1024*1024;
   const TETTO_COMPUTER_SENZA_CARTELLA=2*1024*1024*1024;
   const NOME_DB='dossier-media-web';
 
@@ -57,7 +58,8 @@
   async function marcatore(r){try{const f=await (await r.getFileHandle(MARCATORE)).getFile();return JSON.parse(await f.text());}catch(_){return null;}}
 
   // ---------- memoria temporanea nel browser ----------
-  const tetto=()=>telefono()?TETTO_TELEFONO:TETTO_COMPUTER_SENZA_CARTELLA;
+  const completoTelefono=()=>{try{return localStorage.getItem('dossierArchivioCompletoTelefono')==='1';}catch(_){return false;}};
+  const tetto=()=>telefono()?(completoTelefono()?Number.POSITIVE_INFINITY:TETTO_TELEFONO):TETTO_COMPUTER_SENZA_CARTELLA;
   async function leggiCache(k){const b=await leggi('cache',k).catch(()=>null);if(!b)return null;const i=await leggi('indice',k).catch(()=>null);if(i){i.uso=Date.now();metti('indice',k,i).catch(()=>{});}return b;}
   let ultimoSfoltimento=0;
   async function scriviCache(k,blob,caricato){await metti('cache',k,blob);await metti('indice',k,{dimensione:blob.size,uso:Date.now(),caricato:!!caricato});if(!cloud()?.inRipristino?.()&&Date.now()-ultimoSfoltimento>15000){ultimoSfoltimento=Date.now();await sfoltisci();}}
@@ -187,6 +189,25 @@
       }
     }finally{allineaInCorso=false;if(scaricati)mostra(`Archivio “${NOME_CARTELLA}” allineato: ${scaricati} file copiati dal cloud`,true);}
   }
+  // archivio completo su questo telefono: tutti i DICOM e le immagini nella memoria del browser
+  async function completaTelefono(){
+    const c=cloud();if(!telefono()||!completoTelefono()||!c?.pronto?.()||typeof DossierDB==='undefined')return {scaricati:0,mancanti:0};
+    const lista=elencoFile(await DossierDB.getAll('dicomStudies').catch(()=>[]),await DossierDB.getAll('mediaAttachments').catch(()=>[]));
+    let scaricati=0,mancanti=0,fatti=0;
+    for(const x of lista){
+      let k;try{k=segmenti(x.kind,x.pid,x.owner,x.rel).join('/');}catch(_){continue;}
+      fatti++;if(await leggi('cache',k).catch(()=>null)){continue;}
+      try{const b=await c.scarica(x.kind,x.pid,x.owner,x.rel);if(!b){mancanti++;continue;}await metti('cache',k,b);await metti('indice',k,{dimensione:b.size,uso:Date.now(),caricato:true});scaricati++;}
+      catch(e){if(e&&(e.name==='QuotaExceededError'||/quota/i.test(String(e.message||''))))return {scaricati,mancanti,errore:e};mancanti++;}
+      mostra(`Archivio completo: DICOM e immagini ${fatti} / ${lista.length}`);
+    }
+    if(scaricati)mostra(`DICOM e immagini sul telefono: ${scaricati} file scaricati`,true);
+    return {scaricati,mancanti};
+  }
+  // telefono che torna leggero: restano solo i file non ancora arrivati nel cloud, piu' il tetto temporaneo
+  async function svuotaCache(){
+    for(const k of await chiavi('indice')){const i=await leggi('indice',k).catch(()=>null);if(i&&i.caricato){await togli('cache',k).catch(()=>{});await togli('indice',k).catch(()=>{});}}
+  }
   let barra=null,chiudiBarra=null;
   function mostra(testo,fine){
     if(!barra){barra=document.createElement('div');barra.setAttribute('role','status');barra.style.cssText='position:fixed;left:16px;bottom:16px;z-index:9999;max-width:min(420px,calc(100vw - 32px));background:#fff;border:1px solid #cfe3dc;border-radius:12px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;color:#1f3b34;box-shadow:0 6px 24px rgba(0,0,0,.12)';document.body.appendChild(barra);}
@@ -255,5 +276,5 @@
   setInterval(()=>{void riprovaAttese();},60000);
   // controllo dopo l'accesso: ogni 30 secondi finche' non trova un utente collegato
   const controllo=setInterval(()=>{try{if(window.DossierSecurity?.currentUser?.()){clearInterval(controllo);setTimeout(()=>void verificaCartella(),8000);}}catch(_){}},30000);
-  window.DossierMediaWeb={_chiaviCache:()=>chiavi('indice'),eliminaLocale,assicuraCartella,gestisci,stato,scegliCartella,allinea,riprovaAttese,verificaCartella,elencoFile,_cache:{leggiCache,scriviCache,sfoltisci}};
+  window.DossierMediaWeb={_chiaviCache:()=>chiavi('indice'),completaTelefono,svuotaCache,eliminaLocale,assicuraCartella,gestisci,stato,scegliCartella,allinea,riprovaAttese,verificaCartella,elencoFile,_cache:{leggiCache,scriviCache,sfoltisci}};
 })();

@@ -90,7 +90,8 @@ const DossierDB = (() => {
     if (value && typeof value === 'object') {
       const out={};
       for (const key of Object.keys(value).sort()) {
-        if (key === '_syncMeta') continue;
+        // il file originale di un referto non e' un dato da sincronizzare: sta nel cloud come file separato
+        if (key === '_syncMeta' || key === 'fileBlob') continue;
         out[key]=syncComparable(value[key]);
       }
       return out;
@@ -207,6 +208,7 @@ const DossierDB = (() => {
       const legacyDevice = String(previous?._syncMeta?.deviceId || 'legacy');
       const legacyEvent = String(previous?._syncMeta?.eventId || '');
       for (const key of keys) {
+        if (key === 'fileBlob') continue;
         const hadPrevious = !!previous && Object.prototype.hasOwnProperty.call(previous,key);
         const hasCurrent = Object.prototype.hasOwnProperty.call(value,key);
         const changed = !hadPrevious || !hasCurrent || !syncValueEqual(previous?.[key],value[key]);
