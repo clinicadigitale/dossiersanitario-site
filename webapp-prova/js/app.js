@@ -3424,16 +3424,31 @@ const App = (() => {
   }
 
   async function restoreTrashItem(id) {
-    if(!requireEdit())return;const item=await DossierDB.get('trash',id);if(!item?.payload)return;const payload=item.payload;const restoredDocument={...payload.document};if(!(restoredDocument.fileBlob instanceof Blob&&restoredDocument.fileBlob.size))delete restoredDocument.fileBlob;await DossierDB.put('documents',restoredDocument,{details:{event:'trash-restore'}});setTimeout(()=>void window.DossierDocumentiWeb?.dopoSync?.(),1500);for(const [store,rows] of [['documentVersions',payload.versions||[]],['therapies',payload.therapies||[]],['exemptions',payload.exemptions||[]],['diagnoses',payload.diagnoses||[]]])for(const row of rows)await DossierDB.put(store,row,{details:{event:'trash-restore'}});await DossierDB.del('trash',id,{details:{event:'trash-restore'}});closeModal();await loadAll();await loadPreferences();render();state.activeView='documents';selectNav('documents');renderDocuments();toast('Documento ripristinato');
+    if(!requireEdit())return;const item=await DossierDB.get('trash',id);if(!item?.payload)return;const payload=item.payload;const restoredDocument={...payload.document};if(!(restoredDocument.fileBlob instanceof Blob&&restoredDocument.fileBlob.size))delete restoredDocument.fileBlob;await DossierDB.put('documents',restoredDocument,{details:{event:'trash-restore'}});setTimeout(()=>void window.DossierDocumentiWeb?.dopoSync?.(),1500);for(const [store,rows] of [['documentVersions',payload.versions||[]],['therapies',payload.therapies||[]],['exemptions',payload.exemptions||[]],['diagnoses',payload.diagnoses||[]]])for(const row of rows)await DossierDB.put(store,row,{details:{event:'trash-restore'}});await DossierDB.del('trash',id,{details:{event:'trash-restore'}});await loadAll();await loadPreferences();render();state.activeView='documents';selectNav('documents');renderDocuments();openTrashModal();toast('Documento ripristinato');
   }
 
   async function purgeTrashItem(id) {
-    if(!requireEdit()||!confirm('Eliminare definitivamente questo documento e tutti i collegamenti conservati? L’operazione non è annullabile.'))return;const item=await DossierDB.get('trash',id);await DossierDB.del('trash',id,{details:{event:'trash-purge'}});if(state.archiveHandle&&item?.payload?.document)await deleteSyncedDocument(item.payload.document).catch(()=>{});if(item?.payload?.document&&!state.documents.some(d=>String(d.id)===String(item.payload.document.id)))await window.DossierDocumentiWeb?.eliminaDalCloud?.(item.payload.document);closeModal();await loadAll();renderDocuments();toast('Documento eliminato definitivamente');
+    if(!requireEdit()||!confirm('Eliminare definitivamente questo documento e tutti i collegamenti conservati? L’operazione non è annullabile.'))return;await eliminaElementoCestino(id);await loadAll();renderDocuments();openTrashModal();toast('Documento eliminato definitivamente');
+  }
+
+  async function eliminaElementoCestino(id) {
+    const item=await DossierDB.get('trash',id);await DossierDB.del('trash',id,{details:{event:'trash-purge'}});if(state.archiveHandle&&item?.payload?.document)await deleteSyncedDocument(item.payload.document).catch(()=>{});if(item?.payload?.document&&!state.documents.some(d=>String(d.id)===String(item.payload.document.id)))await window.DossierDocumentiWeb?.eliminaDalCloud?.(item.payload.document);
+  }
+
+  async function svuotaCestino() {
+    const ids=state.trashItems.filter(x=>x.profileId===state.activeProfileId).map(x=>x.id);
+    if(!ids.length||!requireEdit())return;
+    if(!confirm(`Svuotare il cestino?\n\n${ids.length===1?'1 documento verrà eliminato':`${ids.length} documenti verranno eliminati`} definitivamente dall’archivio, su tutti i dispositivi. L’operazione non è annullabile.\n\nProsegui solo se sei consapevole della tua decisione.`))return;
+    let fatti=0,errori=0;
+    for(const id of ids){try{await eliminaElementoCestino(id);fatti++;}catch(err){errori++;console.warn('Elemento del cestino non eliminato:',err);}}
+    await loadAll();renderDocuments();openTrashModal();
+    toast(errori?`Cestino svuotato in parte: ${fatti} eliminati, ${errori} non eliminati. Riprova.`:'Cestino svuotato');
   }
 
   function openTrashModal() {
     const rows=state.trashItems.filter(x=>x.profileId===state.activeProfileId).sort((a,b)=>String(b.deletedAt).localeCompare(String(a.deletedAt)));
     openModal('Cestino documenti','Gli elementi restano ripristinabili finché non vengono eliminati definitivamente.',rows.length?`<div class="list-stack">${rows.map(x=>`<div class="list-item"><div><h3>${esc(x.title||'Documento')}</h3><p>Spostato il ${formatDateTime(x.deletedAt)} · ${(x.payload?.versions||[]).length} versioni OCR conservate</p></div><div class="row-actions"><button class="btn btn-primary btn-small" data-trash-restore="${x.id}">Ripristina</button><button class="btn btn-danger btn-small" data-trash-purge="${x.id}">Elimina definitivamente</button></div></div>`).join('')}</div>`:'<div class="notice">Il Cestino è vuoto.</div>');
+    if(rows.length){const b=document.createElement('div');b.className='row-actions';b.style.marginTop='14px';b.innerHTML=`<button class="btn btn-danger" data-trash-empty>Svuota cestino (${rows.length})</button>`;$('#modalBody').appendChild(b);b.querySelector('[data-trash-empty]').onclick=()=>svuotaCestino();}
     $$('[data-trash-restore]',$('#modalBody')).forEach(b=>b.onclick=()=>restoreTrashItem(b.dataset.trashRestore));$$('[data-trash-purge]',$('#modalBody')).forEach(b=>b.onclick=()=>purgeTrashItem(b.dataset.trashPurge));
   }
 
