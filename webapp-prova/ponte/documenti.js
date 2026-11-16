@@ -87,7 +87,7 @@
   async function fileDi(docs,{titolo='Preparazione dei referti'}={}){
     const out=new Map();const lista=(docs||[]).filter(Boolean);let fatti=0;const daScaricare=lista.filter(d=>!blobOk(d.fileBlob)).length;
     for(const d of lista){
-      if(!blobOk(d.fileBlob)){mostra(`${titolo}: ${fatti+1} / ${daScaricare} referti dal cloud`);}
+      if(!blobOk(d.fileBlob)){mostra(`${titolo}: ${fatti+1} / ${daScaricare} referti dal cloud`,false,{fatti,totale:daScaricare});}
       try{out.set(d.id,await file(d));}catch(e){out.set(d.id,null);console.warn('Referto non disponibile:',d.id,e);}
       if(!blobOk(d.fileBlob))fatti++;
     }
@@ -112,8 +112,8 @@
       const docs=(await DossierDB.getAll('documents')).filter(d=>blobOk(d.fileBlob));
       const cestino=(await DossierDB.getAll('trash')).map(t=>t?.payload?.document).filter(d=>d&&blobOk(d.fileBlob));
       const tutti=[...docs,...cestino];let fatti=0,errori=0;let i=0;
-      mostra(`Invio dei referti al cloud come file separati: 0 / ${tutti.length}`);
-      const lavora=async()=>{while(i<tutti.length&&errori<10){const d=tutti[i++];try{await assicuraCaricato(d);fatti++;}catch(e){errori++;console.warn('Passaggio referto rinviato:',d.id,e);}mostra(`Invio dei referti al cloud come file separati: ${fatti} / ${tutti.length}`);}};
+      mostra(`Invio dei referti al cloud come file separati: 0 / ${tutti.length}`,false,{fatti:0,totale:tutti.length});
+      const lavora=async()=>{while(i<tutti.length&&errori<10){const d=tutti[i++];try{await assicuraCaricato(d);fatti++;}catch(e){errori++;console.warn('Passaggio referto rinviato:',d.id,e);}mostra(`Invio dei referti al cloud come file separati: ${fatti} / ${tutti.length}`,false,{fatti:fatti+errori,totale:tutti.length});}};
       await Promise.all([lavora(),lavora(),lavora()]);
       if(errori){mostra(`Invio dei referti: ${fatti} inviati, ${tutti.length-fatti} da riprovare più tardi`,true);return false;}
       // controllo finale sui referti di adesso (ne puo' essere arrivato uno nuovo durante l'invio)
@@ -167,7 +167,7 @@
             const fresco=await DossierDB.get('trash',x.t.id).catch(()=>null);if(!fresco?.payload?.document||String(fresco._syncMeta?.eventId||'')!==String(x.t._syncMeta?.eventId||'')||!tieneFile())continue;
             await DossierDB.put('trash',{...fresco,payload:{...fresco.payload,document:{...fresco.payload.document,fileBlob:new Blob([b],{type:d.mimeType||b.type||'application/octet-stream'})}}},{sync:false,audit:false});scaricati++;}
         }catch(e){if(e?.codice==='doc_quota'||spazioFinito(e))throw e;mancanti++;if(x.tipo==='doc')segnaNonTrovato(x.d.id);console.warn('Referto non scaricato:',e);}
-        if(avviso)mostra(`Scaricamento dei referti dal cloud: ${scaricati} / ${totale}`);}};
+        if(avviso)mostra(`Scaricamento dei referti dal cloud: ${scaricati} / ${totale}`,false,{fatti:scaricati+mancanti,totale});}};
       await Promise.all([lavora(),lavora(),lavora()]);
       if(avviso&&(scaricati||avviso==='sempre'))mostra(scaricati?`Referti scaricati dal cloud: ${scaricati}${mancanti?` · ${mancanti} non disponibili per ora`:''}`:`Referti dal cloud: ${mancanti} non disponibili per ora`,true);
     }finally{}
@@ -236,12 +236,21 @@
     await togliCaricato(doc.id);await cloud().elimina(doc.id).catch(e=>console.warn('File del referto non eliminato dal cloud:',e));
   }
 
-  // ---------- avviso in basso ----------
+  // ---------- avviso in basso, con barra di avanzamento quando c'e' un conteggio ----------
   let barra=null,chiudiBarra=null;
-  function mostra(testo,fine){
+  function mostra(testo,fine,avanzamento){
     if(!testo){barra?.remove();barra=null;return;}
-    if(!barra){barra=document.createElement('div');barra.setAttribute('role','status');barra.style.cssText='position:fixed;left:16px;bottom:70px;z-index:9999;max-width:min(420px,calc(100vw - 32px));background:#fff;border:1px solid #cfe3dc;border-radius:12px;padding:10px 14px;font:13px/1.4 system-ui,sans-serif;color:#1f3b34;box-shadow:0 6px 20px rgba(0,0,0,.12)';document.body.appendChild(barra);}
-    barra.textContent=testo;clearTimeout(chiudiBarra);if(fine)chiudiBarra=setTimeout(()=>{barra?.remove();barra=null;},6000);
+    if(!barra){barra=document.createElement('div');barra.setAttribute('role','status');barra.setAttribute('aria-live','polite');
+      barra.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:70px;z-index:9999;box-sizing:border-box;width:min(520px,calc(100vw - 32px));background:#fff;border:1px solid #cfe3dc;border-radius:14px;padding:14px 18px;font:14px/1.45 system-ui,sans-serif;color:#1f3b34;box-shadow:0 10px 30px rgba(0,0,0,.18)';
+      barra.innerHTML='<div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><strong data-testo style="font-weight:600"></strong><span data-perc style="font-weight:700;white-space:nowrap"></span></div><div data-traccia style="margin-top:10px;height:10px;border-radius:6px;background:#e3eeea;overflow:hidden"><div data-pieno style="height:100%;width:0;background:#1f7a5c;border-radius:6px;transition:width .3s"></div></div>';
+      document.body.appendChild(barra);}
+    const tot=Number(avanzamento?.totale)||0,fatti=Math.max(0,Math.min(tot,Number(avanzamento?.fatti)||0));
+    const pct=tot?Math.round(fatti*100/tot):null;
+    barra.querySelector('[data-testo]').textContent=testo;
+    barra.querySelector('[data-perc]').textContent=pct===null?'':`${pct}%`;
+    barra.querySelector('[data-traccia]').style.display=pct===null?'none':'';
+    barra.querySelector('[data-pieno]').style.width=`${pct||0}%`;
+    clearTimeout(chiudiBarra);if(fine)chiudiBarra=setTimeout(()=>{barra?.remove();barra=null;},6000);
   }
 
   setInterval(()=>{try{if(window.DossierSecurity?.currentUser?.())void dopoSync();}catch(_){}},5*60*1000);

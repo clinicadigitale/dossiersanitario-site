@@ -125,6 +125,8 @@ async function operazioneMega(op,conn,a,dati){
   if(op==='about'){const i=await chiama(st,'getAccountInfo');return {ok:true,total:Number(i.spaceTotal)||0,used:Number(i.spaceUsed)||0,free:Math.max(0,(Number(i.spaceTotal)||0)-(Number(i.spaceUsed)||0))};}
   if(op==='list'){await aggiorna(st,false);const n=percorso?await cerca(st,percorso):st.root;if(!n||!n.directory)return nonTrovato(percorso,true);return {ok:true,items:elenca(n,a)};}
   if(op==='stat'){const n=percorso?await cerca(st,percorso):st.root;if(!n)return nonTrovato(percorso,false);return {ok:true,item:voce(n,n.name)};}
+  // controllo veloce prima di un invio: niente ricarica forzata dell'albero MEGA (costosa con molti file); l'albero si aggiorna comunque ogni 5 minuti
+  if(op==='statRapido'){await aggiorna(st,false);const n=trova(st,percorso);if(!n)return nonTrovato(percorso,false);return {ok:true,item:voce(n,n.name)};}
   if(op==='read'){const n=await cerca(st,percorso);if(!n||n.directory)return nonTrovato(percorso,false);return {ok:true,data:await scaricaMega(n)};}
   if(op==='write'){await scrivi(st,percorso,dati);return {ok:true};}
   if(op==='mkdir'){await cartella(st,percorso);return {ok:true};}
