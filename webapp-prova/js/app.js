@@ -6279,12 +6279,12 @@ const App = (() => {
         // La destinazione viene scelta PRIMA della generazione: nessun backup finisce automaticamente in Download.
         const destination=await chooseBackupDestination(fileName);if(!destination){toast('Esportazione backup annullata');return;}
         toast('Preparazione e verifica del backup in corso');
-        const barra=(testo,f,fine)=>{try{window.DossierDocumentiWeb?.avanzamento?.(testo,!!fine,fine?null:{fatti:Math.round(1000*Math.max(0,Math.min(1,f))),totale:1000});}catch{}};
-        barra('Backup completo: preparazione',0);
+        const barra=(testo,f,fine)=>{try{window.DossierDocumentiWeb?.avanzamento?.(testo,!!fine,fine?null:{fatti:Math.round(1000*Math.max(0,Math.min(1,f))),totale:1000},{importante:true,titolo:'Backup completo',sottotitolo:'Preparazione e verifica del file di backup.'});}catch{}};
+        barra('Preparazione',0);
         // dispositivi che tengono i file: prima si scaricano dal cloud quelli che mancano
         if(window.DossierDocumentiWeb?.attivo?.()&&window.DossierDocumentiWeb.tieneFile())await window.DossierDocumentiWeb.allinea({avviso:'sempre'}).catch(()=>{});
-        const blob=await buildBackupBlob({onProgress:(f,fase)=>barra(`Backup completo: ${fase||'preparazione'}`,f)});
-        barra('Backup completo: salvataggio del file',1);
+        const blob=await buildBackupBlob({onProgress:(f,fase)=>barra(fase?fase.charAt(0).toUpperCase()+fase.slice(1):'Preparazione',f)});
+        barra('Salvataggio del file',1);
         const senzaReferti=Number(blob.documentFilesInCloud||0);
         await writeBackupToDestination(destination,blob);
         localStorage.setItem('lastBackupAt',new Date().toISOString());
@@ -6292,7 +6292,7 @@ const App = (() => {
         toast(destination.download?'Backup verificato e scaricato nella cartella Download del browser':'Backup verificato e salvato nella cartella scelta');
         if(senzaReferti)alert(`Backup incompleto: contiene tutti i dati ma non i file originali di ${senzaReferti} referti, che restano nell’archivio cloud.\n\nPer un backup con tutti i file, crealo da un dispositivo che tiene l’archivio completo.`);
         if(state.activeView==='backup')renderBackup();
-      }catch(error){try{window.DossierDocumentiWeb?.avanzamento?.(`Backup non completato: ${error.message}`,true);}catch{}toast(`Backup non completato: ${error.message}`);if(state.activeView==='backup')renderBackup();}
+      }catch(error){try{window.DossierDocumentiWeb?.avanzamento?.(`Backup non completato: ${error.message}`,true,null,{importante:true,titolo:'Backup completo',sottotitolo:'Preparazione e verifica del file di backup.'});}catch{}toast(`Backup non completato: ${error.message}`);if(state.activeView==='backup')renderBackup();}
       finally{buttons().forEach(b=>{b.disabled=false;b.setAttribute('aria-busy','false');});}
     })();
     backupExportPromise=task;try{return await task;}finally{backupExportPromise=null;}
