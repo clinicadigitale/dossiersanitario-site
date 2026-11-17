@@ -6217,7 +6217,7 @@ const App = (() => {
     const perProfile=[];
     const avanza=typeof options.onProgress==='function'?options.onProgress:null;let profiliFatti=0;
     for(const p of allProfiles){
-      avanza?.(.6*profiliFatti/Math.max(1,allProfiles.length),`Profilo ${profiliFatti+1} di ${allProfiles.length}`);profiliFatti++;
+      avanza?.(.5*profiliFatti/Math.max(1,allProfiles.length),`profilo ${profiliFatti+1} di ${allProfiles.length}`);profiliFatti++;
       const base=`profili/${profileFolderName(p)}/`,folder=zip.folder(base);void folder;
       const {healthCardFrontBlob,healthCardBackBlob,avatarBlob,...profileMeta}=p;
       await addBackupEntry(zip,entries,base+'profilo.json',backupJson(profileMeta),{kind:'profile',profileId:p.id});
@@ -6243,8 +6243,8 @@ const App = (() => {
     zip.file('manifest.json',backupJson(manifest));
     const estimatedBytes=docsInCloud?0:allDocs.reduce((sum,d)=>sum+Number(d.fileBlob?.size||0),0)+allTrash.reduce((sum,x)=>sum+Number(x.payload?.document?.fileBlob?.size||0),0)+(includeMediaArchive?values.dicomStudies.reduce((sum,x)=>sum+Number(x.totalBytes||0),0)+values.mediaAttachments.reduce((sum,x)=>sum+Number(x.size||0),0):0);
     if(!await ensureStorageFor(Math.max(estimatedBytes,10*1024*1024),'la preparazione del backup'))throw new Error('Spazio insufficiente per preparare il backup');
-    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}},m=>avanza?.(.6+.4*(Number(m?.percent)||0)/100,`Compressione ${Math.round(Number(m?.percent)||0)}%`));
-    const verification=await verifyBackupBlob(blob);state.lastBackupReport=verification.report;if(!verification.ok)throw new Error(verification.report.message);try{blob.documentFilesInCloud=documentFilesInCloud;}catch{}
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}},m=>avanza?.(.5+.3*(Number(m?.percent)||0)/100,'compressione'));
+    const verification=await verifyBackupBlob(blob,avanza?(f=>avanza(.8+.2*Math.max(0,Math.min(1,Number(f)||0)),'verifica')):null);state.lastBackupReport=verification.report;if(!verification.ok)throw new Error(verification.report.message);try{blob.documentFilesInCloud=documentFilesInCloud;}catch{}
     return blob;
     }finally{DossierSecurity.endTechnicalActivity?.('backup-build');}
   }
@@ -6279,16 +6279,20 @@ const App = (() => {
         // La destinazione viene scelta PRIMA della generazione: nessun backup finisce automaticamente in Download.
         const destination=await chooseBackupDestination(fileName);if(!destination){toast('Esportazione backup annullata');return;}
         toast('Preparazione e verifica del backup in corso');
+        const barra=(testo,f,fine)=>{try{window.DossierDocumentiWeb?.avanzamento?.(testo,!!fine,fine?null:{fatti:Math.round(1000*Math.max(0,Math.min(1,f))),totale:1000});}catch{}};
+        barra('Backup completo: preparazione',0);
         // dispositivi che tengono i file: prima si scaricano dal cloud quelli che mancano
         if(window.DossierDocumentiWeb?.attivo?.()&&window.DossierDocumentiWeb.tieneFile())await window.DossierDocumentiWeb.allinea({avviso:'sempre'}).catch(()=>{});
-        const blob=await buildBackupBlob();
+        const blob=await buildBackupBlob({onProgress:(f,fase)=>barra(`Backup completo: ${fase||'preparazione'}`,f)});
+        barra('Backup completo: salvataggio del file',1);
         const senzaReferti=Number(blob.documentFilesInCloud||0);
         await writeBackupToDestination(destination,blob);
         localStorage.setItem('lastBackupAt',new Date().toISOString());
+        barra(destination.download?'Backup verificato e scaricato nella cartella Download del browser':'Backup verificato e salvato nella cartella scelta',1,true);
         toast(destination.download?'Backup verificato e scaricato nella cartella Download del browser':'Backup verificato e salvato nella cartella scelta');
         if(senzaReferti)alert(`Backup incompleto: contiene tutti i dati ma non i file originali di ${senzaReferti} referti, che restano nell’archivio cloud.\n\nPer un backup con tutti i file, crealo da un dispositivo che tiene l’archivio completo.`);
         if(state.activeView==='backup')renderBackup();
-      }catch(error){toast(`Backup non completato: ${error.message}`);if(state.activeView==='backup')renderBackup();}
+      }catch(error){try{window.DossierDocumentiWeb?.avanzamento?.(`Backup non completato: ${error.message}`,true);}catch{}toast(`Backup non completato: ${error.message}`);if(state.activeView==='backup')renderBackup();}
       finally{buttons().forEach(b=>{b.disabled=false;b.setAttribute('aria-busy','false');});}
     })();
     backupExportPromise=task;try{return await task;}finally{backupExportPromise=null;}

@@ -254,5 +254,5 @@
   }
 
   setInterval(()=>{try{if(window.DossierSecurity?.currentUser?.())void dopoSync();}catch(_){}},5*60*1000);
-  window.DossierDocumentiWeb={attivo,leggero,tieneFile,completo,telefono,haFile,file,fileDi,assicuraCaricato,caricaInAttesa,haTuttiIFile,passaggio,alleggerisci,allinea,dopoSync,spazioNecessario,formatoBytes,impostaCompleto,eliminaDalCloud,_leggiCaricato:leggiCaricato};
+  window.DossierDocumentiWeb={avanzamento:mostra,attivo,leggero,tieneFile,completo,telefono,haFile,file,fileDi,assicuraCaricato,caricaInAttesa,haTuttiIFile,passaggio,alleggerisci,allinea,dopoSync,spazioNecessario,formatoBytes,impostaCompleto,eliminaDalCloud,_leggiCaricato:leggiCaricato};
 })();
