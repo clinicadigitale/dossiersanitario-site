@@ -6681,3 +6681,6 @@ html,body{background:#eef4f9;color:#173956}
 .pw-wrap>input{width:100%;padding-right:46px!important}
 .pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:#4b6461;cursor:pointer;border-radius:8px;padding:0}
 .pw-toggle:hover{background:rgba(15,118,110,.08);color:#0f766e}
+
+/* pulsanti occupati o non disponibili: si vede che non si possono premere */
+.btn:disabled,.btn[aria-busy="true"]{opacity:.55;cursor:wait;filter:saturate(.6)}
