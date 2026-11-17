@@ -6684,3 +6684,10 @@ html,body{background:#eef4f9;color:#173956}
 
 /* pulsanti occupati o non disponibili: si vede che non si possono premere */
 .btn:disabled,.btn[aria-busy="true"]{opacity:.55;cursor:wait;filter:saturate(.6)}
+
+/* telefono: nelle preferenze il titolo della scheda va sopra, pillola e pulsante sotto (non si sovrappongono) */
+@media (max-width:640px){
+  .pref-warnings .card-title-row,#updatesPreferenceSection .card-title-row{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:8px!important}
+  .pref-warnings .pref-head-actions,#updatesPreferenceSection .pref-head-actions{margin-left:0!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important}
+  .pref-warnings .pref-head-actions .badge,.pref-warnings .pref-head-actions .btn,#updatesPreferenceSection .pref-head-actions .badge,#updatesPreferenceSection .pref-head-actions .btn{max-width:none!important}
+}
