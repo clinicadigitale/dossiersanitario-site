@@ -96,7 +96,7 @@
     if(!(await marcatore(scelta))&&scelta.name!==NOME_CARTELLA){let vuota=true;try{for await(const _ of scelta.values()){vuota=false;break;}}catch(_){vuota=false;}if(!vuota)r=await scelta.getDirectoryHandle(NOME_CARTELLA,{create:true});}
     let m=await marcatore(r);
     if(!m){m={archiveId:'media_'+crypto.randomUUID(),createdAt:new Date().toISOString(),product:'Clinica Digitale'};const fh=await r.getFileHandle(MARCATORE,{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(m,null,2));await w.close();}
-    await metti('chiavi','radice',r);
+    await metti('chiavi','radice',r);try{localStorage.removeItem('dossierSenzaCartella');}catch(_){}
     // i file gia' presenti nella memoria del browser passano nella cartella
     let spostati=0;
     for(const k of await chiavi('indice')){const b=await leggi('cache',k);if(b){try{await scriviCartella(r,String(k).split('/'),b);spostati++;}catch(_){}}}
@@ -228,24 +228,27 @@
       o.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(15,40,34,.45);display:flex;align-items:center;justify-content:center;padding:16px';
       const testo=nuovo?`Il Dossier tiene DICOM e immagini in una cartella di questo computer. Va fatto una sola volta.<br><br>1. Nella finestra che si apre vai dove preferisci, per esempio in <strong>Documenti</strong> o su un altro disco.<br>2. Crea una cartella nuova con il pulsante <strong>Nuova cartella</strong> e chiamala come vuoi.<br>3. Aprila e premi <strong>Seleziona cartella</strong>, poi conferma con <strong>Modifica file</strong>.<br><br>Chrome non permette di usare direttamente Documenti, Desktop, Download o la radice di un disco: serve una cartella dentro.`:`Il browser chiede di nuovo il permesso per la cartella <strong>${NOME_CARTELLA}</strong>. Se compare la scelta, seleziona <strong>Consenti a ogni visita</strong>.`;
       const extra=forza?'<br><br>Il collegamento all’archivio cloud parte solo dopo che la cartella è stata scelta.':'';
-      o.innerHTML=`<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;padding:22px;font:15px/1.5 system-ui,sans-serif;color:#1f3b34;box-shadow:0 12px 40px rgba(0,0,0,.25)"><h3 style="margin:0 0 8px;font-size:19px">${nuovo?'Cartella dell’archivio su questo computer':'Ricollega la cartella dell’archivio'}</h3><p style="margin:0 0 10px">${testo}${extra}</p><p data-esito style="margin:0 0 12px;color:#9b1c1c;font-weight:600;display:none"></p><div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button type="button" data-dopo style="padding:9px 14px;border-radius:10px;border:1px solid #cfd8d5;background:#fff;cursor:pointer">${forza?'Annulla':'Più tardi'}</button><button type="button" data-ok style="padding:9px 14px;border-radius:10px;border:0;background:#0f6f5c;color:#fff;font-weight:600;cursor:pointer">${nuovo?'Scegli dove crearla':'Ricollega'}</button></div></div>`;
+      o.innerHTML=`<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;padding:22px;font:15px/1.5 system-ui,sans-serif;color:#1f3b34;box-shadow:0 12px 40px rgba(0,0,0,.25)"><h3 style="margin:0 0 8px;font-size:19px">${nuovo?'Cartella dell’archivio su questo computer':'Ricollega la cartella dell’archivio'}</h3><p style="margin:0 0 10px">${testo}${extra}</p><p data-esito style="margin:0 0 12px;color:#9b1c1c;font-weight:600;display:none"></p><div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap"><button type="button" data-dopo style="padding:9px 14px;border-radius:10px;border:1px solid #cfd8d5;background:#fff;cursor:pointer">${forza?'Annulla':'Più tardi'}</button><button type="button" data-senza style="display:none;padding:9px 14px;border-radius:10px;border:1px solid #0f6f5c;background:#fff;color:#0f6f5c;font-weight:600;cursor:pointer">Continua senza cartella</button><button type="button" data-ok style="padding:9px 14px;border-radius:10px;border:0;background:#0f6f5c;color:#fff;font-weight:600;cursor:pointer">${nuovo?'Scegli dove crearla':'Ricollega'}</button></div></div>`;
       document.body.appendChild(o);
       const esito=o.querySelector('[data-esito]');
       o.querySelector('[data-dopo]').onclick=()=>{o.remove();fine(false);};
+      const senza=o.querySelector('[data-senza]');let tentativi=0;
+      // se la cartella non si riesce a collegare, il Dossier non si blocca: DICOM e immagini restano nella memoria del browser
+      senza.onclick=()=>{try{localStorage.setItem('dossierSenzaCartella','1');}catch(_){}o.remove();fine(true);};
       o.querySelector('[data-ok]').onclick=async()=>{
         let ok=false;
         try{if(nuovo){const r=await scegliCartella();ok=!r?.cancelled&&!!(await radice());}else{ok=!!(await radice({chiedi:true}));if(ok)setTimeout(()=>void allinea(),1000);}}
-        catch(e){esito.textContent='Cartella non collegata: '+(e?.message||e);esito.style.display='block';return;}
-        if(!ok){esito.textContent='Nessuna cartella collegata. Se Chrome ha detto che la cartella contiene file di sistema, crea una cartella nuova dentro quella posizione (pulsante «Nuova cartella») e scegli quella. Poi conferma «Modifica file». Clicca di nuovo il pulsante verde'+(forza?', oppure Annulla per non collegare l’archivio.':'.');esito.style.display='block';return;}
+        catch(e){tentativi++;senza.style.display='';esito.textContent='Cartella non collegata ('+(e?.name||'errore')+': '+(e?.message||e)+'). Puoi riprovare con un’altra cartella oppure premere «Continua senza cartella»: il Dossier funziona lo stesso e tiene DICOM e immagini nella memoria del browser.';esito.style.display='block';return;}
+        if(!ok){tentativi++;senza.style.display='';esito.textContent='Nessuna cartella collegata. Se Chrome ha detto che la cartella contiene file di sistema, crea una cartella nuova dentro quella posizione (pulsante «Nuova cartella») e scegli quella. Poi conferma «Modifica file». Puoi riprovare con il pulsante verde oppure premere «Continua senza cartella»: il Dossier funziona lo stesso.';esito.style.display='block';return;}
         o.remove();fine(true);};
     }).catch(()=>fine(false)));
   }
   // Prima di un collegamento o ripristino dal cloud: su computer la cartella e' obbligatoria,
   // cosi' DICOM e immagini finiscono direttamente li'. Restituisce false se l'utente rinuncia.
-  async function assicuraCartella(){if(!conCartella())return true;const h=await leggi('chiavi','radice').catch(()=>null);if(h&&await radice())return true;return await avvisaCartella(true);}
+  async function assicuraCartella(){if(!conCartella())return true;const h=await leggi('chiavi','radice').catch(()=>null);if(h&&await radice())return true;try{if(!h&&localStorage.getItem('dossierSenzaCartella')==='1')return true;}catch(_){}return await avvisaCartella(true);}
   async function verificaCartella(){
     if(!conCartella())return;const h=await leggi('chiavi','radice').catch(()=>null);
-    if(!h){if(cloud()?.pronto?.())avvisaCartella();return;}
+    if(!h){let senza=false;try{senza=localStorage.getItem('dossierSenzaCartella')==='1';}catch(_){}if(cloud()?.pronto?.()&&!senza)avvisaCartella();return;}
     if(await radice()){void allinea();return;}
     avvisaCartella();
   }
