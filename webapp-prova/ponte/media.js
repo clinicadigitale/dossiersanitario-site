@@ -96,13 +96,15 @@
     if(!(await marcatore(scelta))&&scelta.name!==NOME_CARTELLA){let vuota=true;try{for await(const _ of scelta.values()){vuota=false;break;}}catch(_){vuota=false;}if(!vuota)r=await scelta.getDirectoryHandle(NOME_CARTELLA,{create:true});}
     let m=await marcatore(r);
     if(!m){m={archiveId:'media_'+crypto.randomUUID(),createdAt:new Date().toISOString(),product:'Clinica Digitale'};const fh=await r.getFileHandle(MARCATORE,{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(m,null,2));await w.close();}
+    // permesso di scrittura: se Chrome ha dato solo la lettura, lo chiede subito (siamo ancora nel clic dell'utente)
+    let permesso='granted';try{permesso=await r.queryPermission({mode:'readwrite'});if(permesso!=='granted')permesso=await r.requestPermission({mode:'readwrite'});}catch(e){permesso='errore:'+(e?.name||e);}
     await metti('chiavi','radice',r);try{localStorage.removeItem('dossierSenzaCartella');}catch(_){}
     // i file gia' presenti nella memoria del browser passano nella cartella
     let spostati=0;
     for(const k of await chiavi('indice')){const b=await leggi('cache',k);if(b){try{await scriviCartella(r,String(k).split('/'),b);spostati++;}catch(_){}}}
     if(spostati){for(const k of await chiavi('indice')){await togli('cache',k).catch(()=>{});await togli('indice',k).catch(()=>{});}}
     setTimeout(()=>void allinea(),1500);
-    return {...await stato(),cancelled:false,migratedFiles:spostati};
+    return {...await stato(),cancelled:false,migratedFiles:spostati,permesso};
   }
   async function salva(kind,pid,owner,rel,blob){
     const segs=segmenti(kind,pid,owner,rel),k=segs.join('/');const c=cloud();
@@ -237,9 +239,9 @@
       senza.onclick=()=>{try{localStorage.setItem('dossierSenzaCartella','1');}catch(_){}o.remove();fine(true);};
       o.querySelector('[data-ok]').onclick=async()=>{
         let ok=false;
-        try{if(nuovo){const r=await scegliCartella();ok=!r?.cancelled&&!!(await radice());}else{ok=!!(await radice({chiedi:true}));if(ok)setTimeout(()=>void allinea(),1000);}}
+        let motivo='';try{if(nuovo){const r=await scegliCartella();ok=!r?.cancelled&&!!(await radice());if(!ok)motivo=r?.cancelled?'Chrome non ha consegnato nessuna cartella (scelta annullata oppure posizione non permessa).':`La cartella è stata scelta ma Chrome non ha dato il permesso di scrittura (stato: ${r?.permesso||'sconosciuto'}).`;}else{ok=!!(await radice({chiedi:true}));if(ok)setTimeout(()=>void allinea(),1000);}}
         catch(e){tentativi++;senza.style.display='';esito.textContent='Cartella non collegata ('+(e?.name||'errore')+': '+(e?.message||e)+'). Puoi riprovare con un’altra cartella oppure premere «Continua senza cartella»: il Dossier funziona lo stesso e tiene DICOM e immagini nella memoria del browser.';esito.style.display='block';return;}
-        if(!ok){tentativi++;senza.style.display='';esito.textContent='Nessuna cartella collegata. Se Chrome ha detto che la cartella contiene file di sistema, crea una cartella nuova dentro quella posizione (pulsante «Nuova cartella») e scegli quella. Poi conferma «Modifica file». Puoi riprovare con il pulsante verde oppure premere «Continua senza cartella»: il Dossier funziona lo stesso.';esito.style.display='block';return;}
+        if(!ok){tentativi++;senza.style.display='';esito.textContent=(motivo?motivo+' ':'')+'Nessuna cartella collegata. Se Chrome ha detto che la cartella contiene file di sistema, crea una cartella nuova dentro quella posizione (pulsante «Nuova cartella») e scegli quella. Poi conferma «Modifica file». Puoi riprovare con il pulsante verde oppure premere «Continua senza cartella»: il Dossier funziona lo stesso.';esito.style.display='block';return;}
         o.remove();fine(true);};
     }).catch(()=>fine(false)));
   }
